@@ -38,3 +38,6 @@ x64/*
 *.out
 *.app
 Core/Shaders/compile_shaders_glsl.bat
+*.vcxproj
+*.filters
+*.user
