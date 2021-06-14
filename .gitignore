@@ -2,6 +2,9 @@
 x64/*
 .vs/*
 
+# SPIR-V compiled shaders
+*.spv
+
 # Prerequisites
 *.d
 
