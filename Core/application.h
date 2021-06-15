@@ -34,7 +34,10 @@ namespace EngineCore
 		bool keyAPressed = false;
 		bool keySPressed = false;
 		bool keyDPressed = false;
-		void resetPressedKeys() { keyWPressed = false; keyAPressed = false; keySPressed = false; keyDPressed = false; }
+		bool keyRPressed = false;
+		bool keyFPressed = false;
+		void resetPressedKeys() { keyWPressed = false; keyAPressed = false; 
+		keySPressed = false; keyDPressed = false; keyRPressed = false; keyFPressed = false;}
 
 	private:
 		void loadEngineObjects();

@@ -43,7 +43,7 @@ namespace EngineCore
 			{
 				renderer.beginSwapchainRenderPass(commandBuffer);
 				renderSys.renderEngineObjects(commandBuffer, engineObjects, &camera, deltaTime, elapsedTime, 
-								std::vector<bool>{keyWPressed, keyAPressed, keySPressed, keyDPressed});
+								std::vector<bool>{keyWPressed, keyAPressed, keySPressed, keyDPressed, keyRPressed, keyFPressed});
 				renderer.endSwapchainRenderPass(commandBuffer);
 				renderer.endFrame();
 				camera.aspectRatio = window.getAspectRatio(); // TODO: ideally should only be updated when window was resized

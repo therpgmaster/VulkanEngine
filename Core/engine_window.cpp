@@ -63,6 +63,12 @@ namespace EngineCore
 			break;
 		case 68:
 			thisWindow->tmpApplicationObjPtr->keyDPressed = true;
+			break;
+		case 82:
+			thisWindow->tmpApplicationObjPtr->keyRPressed = true;
+			break;
+		case 70:
+			thisWindow->tmpApplicationObjPtr->keyFPressed = true;
 					}
 	}
 

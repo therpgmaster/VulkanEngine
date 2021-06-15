@@ -39,7 +39,7 @@ namespace EngineCore
 
 		void renderEngineObjects(VkCommandBuffer commandBuffer, std::vector<EngineObject>& engineObjects,
 							Camera* camera, const float& deltaTimeSeconds, float time,
-							std::vector<bool> wasd);
+							std::vector<bool> wasdrf);
 
 	private:
 		void createPipelineLayout();

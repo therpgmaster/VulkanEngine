@@ -60,7 +60,7 @@ namespace EngineCore
 	}
 
 	void EngineRenderSystem::renderEngineObjects(VkCommandBuffer commandBuffer, std::vector<EngineObject>& engineObjects, 
-										Camera* camera, const float& deltaTimeSeconds, float time, std::vector<bool> wasd)
+										Camera* camera, const float& deltaTimeSeconds, float time, std::vector<bool> wasdrf)
 	{
 		pipeline->bind(commandBuffer);
 
@@ -84,11 +84,13 @@ namespace EngineCore
 			
 			float ix = 0.f; float iy = 0.f; float iz = 0.f;
 			const float moveSpeed = 60.f;
-			if (wasd[0]) { ix = moveSpeed * deltaTimeSeconds; }
-			if (wasd[1]) { iy = -moveSpeed * deltaTimeSeconds; }
-			if (wasd[2]) { ix = -moveSpeed * deltaTimeSeconds; }
-			if (wasd[3]) { iy = moveSpeed * deltaTimeSeconds; }
-			camera->transform.translation += glm::vec3{ ix, iy, iz };
+			if (wasdrf[0]) { ix = moveSpeed * deltaTimeSeconds; }
+			if (wasdrf[1]) { iy = -moveSpeed * deltaTimeSeconds; }
+			if (wasdrf[2]) { ix = -moveSpeed * deltaTimeSeconds; }
+			if (wasdrf[3]) { iy = moveSpeed * deltaTimeSeconds; }
+			if (wasdrf[4]) { iz = moveSpeed * deltaTimeSeconds/10; }
+			if (wasdrf[5]) { iz = -moveSpeed * deltaTimeSeconds/10; }
+			camera->transform.translation += glm::vec3{ ix, iy, iz }; 
 
 
 			glm::mat4 vMatrix = glm::inverse(camera->transform.mat4());
