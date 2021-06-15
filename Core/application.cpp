@@ -24,6 +24,10 @@ namespace EngineCore
 	void EngineApplication::startExecution()
 	{
 		EngineRenderSystem renderSys{ device, renderer.getSwapchainRenderPass() };
+
+		Camera camera(45.f, 0.01f, 100.f); // TODO: this is a temporary single-camera setup
+		window.setAppPtr(this); // temporary input system (see engine window class)
+
 		// window event loop
 		double deltaTime = 0.0;
 		double elapsedTime = 0.0;
@@ -33,13 +37,16 @@ namespace EngineCore
 			elapsedTime = elapsedTime + deltaTime;
 			//std::cout << " FPS " << getFps(deltaTime) << " time(s) " << elapsedTime << "\n";
 
+			resetPressedKeys(); // temporary input system
 			glfwPollEvents();
 			if (auto commandBuffer = renderer.beginFrame()) 
 			{
 				renderer.beginSwapchainRenderPass(commandBuffer);
-				renderSys.renderEngineObjects(commandBuffer, engineObjects, deltaTime, elapsedTime);
+				renderSys.renderEngineObjects(commandBuffer, engineObjects, &camera, deltaTime, elapsedTime, 
+								std::vector<bool>{keyWPressed, keyAPressed, keySPressed, keyDPressed});
 				renderer.endSwapchainRenderPass(commandBuffer);
 				renderer.endFrame();
+				camera.aspectRatio = window.getAspectRatio(); // TODO: ideally should only be updated when window was resized
 			}
 			deltaTime = getTiming();
 		}
@@ -109,18 +116,20 @@ namespace EngineCore
 
 	void EngineApplication::loadEngineObjects() 
 	{
-		std::shared_ptr<EngineModel> cubemodel = createCubeModel(device, { 0.f, 0.f, 0.f }, 0.35f);
+		std::shared_ptr<EngineModel> cubemodel = createCubeModel(device, { 0.f, 0.f, 0.f }, 1.f);
 		auto cube = EngineObject::createObject();
 		cube.model = cubemodel;
 		cube.transform.translation = { 0.f, 0.f, 0.f };
-		cube.transform.scale = { 1.f, 1.f, 1.f };
+		cube.transform.scale = { 0.35f, 0.35f, 0.35f };
 		engineObjects.push_back(std::move(cube));
+
 		// 2nd cube (test)
-		std::shared_ptr<EngineModel> cubemodel2 = createCubeModel(device, { -0.15f, 0.15f, -0.5f }, 0.2f);
+		std::shared_ptr<EngineModel> cubemodel2 = createCubeModel(device, { 0.f, 0.f, 0.f }, 1.f);
 		auto cube2 = EngineObject::createObject();
 		cube2.model = cubemodel2;
-		cube2.transform.translation = { 0.f, 0.f, 0.f };
-		cube2.transform.scale = { 1.f, 1.f, 1.f };
+		cube2.transform.translation = { -0.15f, 0.15f, -0.5f };
+		cube2.transform.scale = { 0.2f, 0.2f, 0.2f };
+		cube2.transform.rotation = { 45.f, 0.f, 0.f };
 		engineObjects.push_back(std::move(cube2));
 	}
 

@@ -1,4 +1,5 @@
 #include "engine_window.h"
+#include "application.h" // TODO: only used for temporary keyboard input system
 #include <stdexcept>
 
 namespace EngineCore
@@ -26,6 +27,7 @@ namespace EngineCore
 		windowPtr = glfwCreateWindow(width, height, wndName.c_str(), nullptr, nullptr);
 		glfwSetWindowUserPointer(windowPtr, this);
 		glfwSetFramebufferSizeCallback(windowPtr, framebufferResizedCallback); // bind framebufferResizedCallback to resize event
+		glfwSetKeyCallback(windowPtr, keyPressedCallback);
 	}
 
 	void EngineWindow::createWindowSurface(VkInstance inst, VkSurfaceKHR* surface)
@@ -38,10 +40,30 @@ namespace EngineCore
 
 	void EngineWindow::framebufferResizedCallback(GLFWwindow* window, int width, int height) 
 	{
-		auto engineWindow = reinterpret_cast<EngineWindow*>(glfwGetWindowUserPointer(window));
-		engineWindow->framebufferResized = true;
-		engineWindow->width = width;
-		engineWindow->height = height;
+		auto thisWindow = reinterpret_cast<EngineWindow*>(glfwGetWindowUserPointer(window));
+		thisWindow->framebufferResized = true;
+		thisWindow->width = width;
+		thisWindow->height = height;
+	}
+
+	void EngineWindow::keyPressedCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+	{
+		auto thisWindow = reinterpret_cast<EngineWindow*>(glfwGetWindowUserPointer(window));
+		// TODO: make a more elegant system for registering keyboard input
+		if (thisWindow->tmpApplicationObjPtr == nullptr) { return; }
+		switch (key) {
+		case 87:
+			thisWindow->tmpApplicationObjPtr->keyWPressed = true;
+			break;
+		case 65:
+			thisWindow->tmpApplicationObjPtr->keyAPressed = true;
+			break;
+		case 83:
+			thisWindow->tmpApplicationObjPtr->keySPressed = true;
+			break;
+		case 68:
+			thisWindow->tmpApplicationObjPtr->keyDPressed = true;
+					}
 	}
 
 } // namespace

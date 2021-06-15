@@ -21,16 +21,21 @@ namespace EngineCore
 		const bool& getCloseWindow() { return glfwWindowShouldClose(windowPtr); }
 
 		VkExtent2D getExtent() { return { static_cast<uint32_t>(width), static_cast<uint32_t>(height) }; }
+		float getAspectRatio() { return width / height; }
 		bool wasWindowResized() { return framebufferResized; }
 		void resetWindowResizedFlag() { framebufferResized = false; }
 
 		// creates the surface that acts as an interface between the engine and vulkan
 		void createWindowSurface(VkInstance inst, VkSurfaceKHR* surface);
 
+		class EngineApplication* tmpApplicationObjPtr = nullptr; // TODO: only used to report keyboard inputs - temporary solution
+		void setAppPtr(EngineApplication* ptr) { tmpApplicationObjPtr = ptr; }
+
 	private:
 		// window initialization using GLFW (on construct)
 		void initWindow();
 		static void framebufferResizedCallback(GLFWwindow* window, int width, int height);
+		static void keyPressedCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
 		int width;
 		int height;

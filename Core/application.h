@@ -30,6 +30,12 @@ namespace EngineCore
 		// begins the main window event loop (call on newly created engine application instances)
 		void startExecution();
 
+		bool keyWPressed = false; // TODO: temporary input system
+		bool keyAPressed = false;
+		bool keySPressed = false;
+		bool keyDPressed = false;
+		void resetPressedKeys() { keyWPressed = false; keyAPressed = false; keySPressed = false; keyDPressed = false; }
+
 	private:
 		void loadEngineObjects();
 
@@ -39,6 +45,7 @@ namespace EngineCore
 		EngineDevice device{ window };
 		// engine renderer object
 		EngineRenderer renderer{ window, device };
+
 		std::vector<EngineObject> engineObjects;
 
 		// timing
@@ -48,7 +55,7 @@ namespace EngineCore
 			timingStartPoint = std::chrono::steady_clock::now();
 		};
 		double getTiming()
-		{ /* don't mess with this function, it'll break everything */
+		{ /* don't mess with this function, it'll break */
 			std::chrono::duration<double, std::milli> ms = std::chrono::steady_clock::now() - timingStartPoint;
 			return ms.count() / 1000.0;
 		};

@@ -44,9 +44,7 @@ namespace EngineCore
 		pipelineLayoutInfo.pushConstantRangeCount = 1; // push constant
 		pipelineLayoutInfo.pPushConstantRanges = &pushConstRange;
 		if (vkCreatePipelineLayout(device.device(), &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
-		{
-			throw std::runtime_error("failed to create pipeline layout");
-		}
+		{ throw std::runtime_error("failed to create pipeline layout"); }
 	}
 
 	void EngineRenderSystem::createPipeline(VkRenderPass renderPass)
@@ -62,36 +60,41 @@ namespace EngineCore
 	}
 
 	void EngineRenderSystem::renderEngineObjects(VkCommandBuffer commandBuffer, std::vector<EngineObject>& engineObjects, 
-										const float& deltaTimeSeconds, float time)
+										Camera* camera, const float& deltaTimeSeconds, float time, std::vector<bool> wasd)
 	{
 		pipeline->bind(commandBuffer);
 
 		for (auto& obj : engineObjects)
-		{	// spin 3D primitive
-			float spinRate = 0.2f;
+		{	
+			SimplePushConstantData push{};
+			push.color = obj.color;
+			// spin 3D primitive
+			float spinRate = 0.25f;
 			obj.transform.rotation.y = glm::mod(obj.transform.rotation.y + (spinRate * deltaTimeSeconds), glm::two_pi<float>());
 			obj.transform.rotation.x = glm::mod(obj.transform.rotation.x + ((spinRate/2.f) * deltaTimeSeconds), glm::two_pi<float>());
 
-			obj.transform.translation.z = -0.6f;
-			obj.transform.translation.y += deltaTimeSeconds * 0.05f;
-			obj.transform.translation.x += deltaTimeSeconds * 0.05f;
+			//obj.transform.translation.x = obj.transform.translation.x + (0.6f * deltaTimeSeconds);
 			
-			SimplePushConstantData push{};
-			push.color = obj.color;
+			if (camera == nullptr) { throw std::runtime_error("renderEngineObjects null camera pointer"); }
 
-			double near = 0.01f;
-			double far = 100.f;
-			float fov = 45.f;
-			float aspect = 800.f / 600.f;
+			//camera->transform.testTranslation(time, 0.5f, deltaTimeSeconds);
+			//camera.translation.z = camera.translation.z - (1.3f * deltaTimeSeconds);
 
-			double l1 = (time / 1); // linear interpolation
-			if (l1 > 1.f) { l1 = 1.f; }
-			float matlerp = lerp(0.0, 1.0, l1); 
-			glm::mat4 lerpM = 
-				lerpMat4(matlerp, orthographicProjectionMatrix(near, far), 
-					perspectiveProjectionMatrix(aspect, fov, near, far));
+			// temporary input system
 			
-			push.transform = lerpM * obj.transform.mat4();
+			float ix = 0.f; float iy = 0.f; float iz = 0.f;
+			const float moveSpeed = 60.f;
+			if (wasd[0]) { ix = moveSpeed * deltaTimeSeconds; }
+			if (wasd[1]) { iy = -moveSpeed * deltaTimeSeconds; }
+			if (wasd[2]) { ix = -moveSpeed * deltaTimeSeconds; }
+			if (wasd[3]) { iy = moveSpeed * deltaTimeSeconds; }
+			camera->transform.translation += glm::vec3{ ix, iy, iz };
+
+
+			glm::mat4 vMatrix = glm::inverse(camera->transform.mat4());
+			glm::mat4 pMatrix = perspectiveMatrix(camera->aspectRatio, camera->vFOV, camera->nearPlane, camera->farPlane);
+
+			push.transform = pMatrix * worldToVulkan() * vMatrix * obj.transform.mat4();
 
 			vkCmdPushConstants(
 				commandBuffer,
