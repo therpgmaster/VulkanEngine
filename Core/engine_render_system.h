@@ -1,32 +1,20 @@
 #pragma once
 
 #include "engine_device.h"
-#include "engine_object.h"
 #include "engine_pipeline.h"
 
+// glm
+#include <glm/gtc/matrix_transform.hpp>
 // std
 #include <memory>
 #include <vector>
 #include <cmath> // only used in perspective calculation
 
+class CameraComponent;
+#include "UserIntegrals/StaticMesh.h"
+
 namespace EngineCore
 {
-	class Camera
-	{
-	public:
-		Camera(const float& verticalFOV, const float& near, const float& far)
-		{
-			nearPlane = near;
-			farPlane = far;
-			vFOV = verticalFOV;
-		};
-		float nearPlane = 0.01f;
-		float farPlane = 10.f;
-		float vFOV = 45.f;
-		float aspectRatio = 1.333f;
-		TransformComponent transform{};
-	};
-
 	class EngineRenderSystem
 	{
 	public:
@@ -37,8 +25,8 @@ namespace EngineCore
 		EngineRenderSystem(const EngineRenderSystem&) = delete;
 		EngineRenderSystem& operator=(const EngineRenderSystem&) = delete;
 
-		void renderEngineObjects(VkCommandBuffer commandBuffer, std::vector<EngineObject>& engineObjects,
-							Camera* camera, const float& deltaTimeSeconds, float time,
+		void renderEngineObjects(VkCommandBuffer commandBuffer, std::vector<StaticMesh*>& meshes,
+							CameraComponent* camera, const float& deltaTimeSeconds, float time,
 							std::vector<bool> wasdrf);
 
 	private:
@@ -49,7 +37,7 @@ namespace EngineCore
 		std::unique_ptr<EnginePipeline> pipeline;
 		VkPipelineLayout pipelineLayout;
 
-		glm::mat4 orthographicMatrix(const float& n, const float& f)
+		static glm::mat4 orthographicMatrix(const float& n, const float& f)
 		{
 			float r = 1.f;
 			float l = -1.f;
@@ -74,21 +62,21 @@ namespace EngineCore
 			return projection;
 		}
 
-		glm::mat4 perspectiveMatrix(float aspectRatio, float fov, float n, float f) 
+		static glm::mat4 perspectiveMatrix(float aspectRatio, float fov, float n, float f) 
 		{
 			float x = 1.0f / tan(glm::radians(0.5f * fov));
 			//	"cookbook" projection 
-			glm::mat4 perspectiveMatrix =
+			glm::mat4 pmatrix =
 			{ 
 				x / aspectRatio, 0.0f, 0.0f, 0.0f,
 				0.0f, x, 0.0f, 0.0f, /* [1][1]: x for y=down (default), -x for y=up */
 				0.0f, 0.0f, f / (n - f), -1.0f,
 				0.0f, 0.0f, (n * f) / (n - f), 1.0f // [3][3]: (last) changed from 0 to 1
 			};
-			return perspectiveMatrix;
+			return pmatrix;
 		}
 
-		glm::mat4 wsToVulkanMatrix()
+		static glm::mat4 wsToVulkanMatrix()
 		{
 			// produces a matrix for converting vectors between coordinate systems
 			glm::vec3 X = { 0.f, 1.f, 0.f }; // vulkan x = world y
@@ -104,7 +92,7 @@ namespace EngineCore
 			};
 		}
 
-		glm::mat4 worldToVulkan()
+		static glm::mat4 worldToVulkan()
 		{
 			// produces a matrix for converting vectors between coordinate systems
 			glm::vec3 X = { 0.f, 1.f, 0.f }; // vulkan x = world y
@@ -120,9 +108,9 @@ namespace EngineCore
 			};
 		}
 
-		glm::mat4 lerpMat4(float t, glm::mat4 matA, glm::mat4 matB);
+		static glm::mat4 lerpMat4(float t, glm::mat4 matA, glm::mat4 matB);
 
-		float lerp(const double& a, const double& b, const double& t)
+		static float lerp(const double& a, const double& b, const double& t)
 		{
 			return (a * (1.0 - t)) + (b * t);
 		}

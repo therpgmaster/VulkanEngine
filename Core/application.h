@@ -2,14 +2,15 @@
 
 #include "engine_window.h"
 #include "engine_device.h"
-#include "engine_object.h"
 #include "engine_renderer.h"
-
 
 // std
 #include <memory>
 #include <vector>
 #include <chrono> // timing
+
+#include "UserIntegrals/StaticMesh.h"
+#include "UserIntegrals/GenericActor.h"
 
 namespace EngineCore
 {
@@ -40,7 +41,7 @@ namespace EngineCore
 		keySPressed = false; keyDPressed = false; keyRPressed = false; keyFPressed = false;}
 
 	private:
-		void loadEngineObjects();
+		void loadActors();
 
 		// engine application window (creates a window using GLFW) 
 		EngineWindow window{ WIDTH, HEIGHT, "Vulkan Window" };
@@ -49,7 +50,7 @@ namespace EngineCore
 		// engine renderer object
 		EngineRenderer renderer{ window, device };
 
-		std::vector<EngineObject> engineObjects;
+		std::vector<StaticMesh*> loadedMeshes{ nullptr };
 
 		// timing
 		std::chrono::steady_clock::time_point timingStartPoint;

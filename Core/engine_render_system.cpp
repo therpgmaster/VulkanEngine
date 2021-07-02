@@ -1,5 +1,7 @@
 #include "engine_render_system.h"
 
+#include "UserIntegrals/CameraComponent.h"
+
 #include <stdexcept>
 #include <array>
 #include <iostream> // temporary
@@ -59,19 +61,22 @@ namespace EngineCore
 			"G:/VulkanDev/VulkanEngine/Core/Shaders/shader.frag.spv"); // SPIR-V shader files (hardcoded paths!)
 	}
 
-	void EngineRenderSystem::renderEngineObjects(VkCommandBuffer commandBuffer, std::vector<EngineObject>& engineObjects, 
-										Camera* camera, const float& deltaTimeSeconds, float time, std::vector<bool> wasdrf)
+	void EngineRenderSystem::renderEngineObjects(VkCommandBuffer commandBuffer, std::vector<StaticMesh*>& meshes,
+										CameraComponent* camera, const float& deltaTimeSeconds, float time, std::vector<bool> wasdrf)
 	{
 		pipeline->bind(commandBuffer);
 
-		for (auto& obj : engineObjects)
-		{	
+		for (auto* mesh : meshes)
+		{
+			if (mesh == nullptr) continue;
+
 			SimplePushConstantData push{};
-			push.color = obj.color;
+
+			push.color = mesh->color;
 			// spin 3D primitive
 			float spinRate = 0.25f;
-			obj.transform.rotation.y = glm::mod(obj.transform.rotation.y + (spinRate * deltaTimeSeconds), glm::two_pi<float>());
-			obj.transform.rotation.x = glm::mod(obj.transform.rotation.x + ((spinRate/2.f) * deltaTimeSeconds), glm::two_pi<float>());
+			mesh->transform.rotation.y = glm::mod(mesh->transform.rotation.y + (spinRate * deltaTimeSeconds), glm::two_pi<float>());
+			mesh->transform.rotation.x = glm::mod(mesh->transform.rotation.x + ((spinRate/2.f) * deltaTimeSeconds), glm::two_pi<float>());
 
 			//obj.transform.translation.x = obj.transform.translation.x + (0.6f * deltaTimeSeconds);
 			
@@ -81,7 +86,6 @@ namespace EngineCore
 			//camera.translation.z = camera.translation.z - (1.3f * deltaTimeSeconds);
 
 			// temporary input system
-			
 			float ix = 0.f; float iy = 0.f; float iz = 0.f;
 			const float moveSpeed = 60.f;
 			if (wasdrf[0]) { ix = moveSpeed * deltaTimeSeconds; }
@@ -92,21 +96,16 @@ namespace EngineCore
 			if (wasdrf[5]) { iz = -moveSpeed * deltaTimeSeconds/10; }
 			camera->transform.translation += glm::vec3{ ix, iy, iz }; 
 
-
 			glm::mat4 vMatrix = glm::inverse(camera->transform.mat4());
 			glm::mat4 pMatrix = perspectiveMatrix(camera->aspectRatio, camera->vFOV, camera->nearPlane, camera->farPlane);
 
-			push.transform = pMatrix * worldToVulkan() * vMatrix * obj.transform.mat4();
+			push.transform = pMatrix * worldToVulkan() * vMatrix * mesh->transform.mat4();
 
-			vkCmdPushConstants(
-				commandBuffer,
-				pipelineLayout,
+			vkCmdPushConstants(commandBuffer, pipelineLayout,
 				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-				0,
-				sizeof(SimplePushConstantData),
-				&push);
-			obj.model->bind(commandBuffer);
-			obj.model->draw(commandBuffer);
+				0, sizeof(SimplePushConstantData), &push);
+			mesh->bind(commandBuffer);
+			mesh->draw(commandBuffer);
 		}
 	}
 
