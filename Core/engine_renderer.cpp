@@ -45,7 +45,6 @@ namespace EngineCore
 		}
 		vkDeviceWaitIdle(device.device());
 
-		
 		if (swapchain == nullptr) 
 		{
 			swapchain = std::make_unique<EngineSwapChain>(device, extent);
@@ -57,8 +56,6 @@ namespace EngineCore
 			if (!oldSwapChain->compareSwapFormats(*swapchain.get())) 
 			{ throw std::runtime_error("swap chain image or depth format changed unexpectedly"); }
 		}
-
-		// todo
 	}
 
 	VkCommandBuffer EngineRenderer::beginFrame() 

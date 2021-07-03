@@ -47,7 +47,7 @@ namespace EngineCore
 		EngineWindow window{ WIDTH, HEIGHT, "Vulkan Window" };
 		// render device (instantiates vulkan)
 		EngineDevice device{ window };
-		// engine renderer object
+		// the renderer manages the swapchain and the vulkan command buffers
 		EngineRenderer renderer{ window, device };
 
 		std::vector<StaticMesh*> loadedMeshes{ nullptr };

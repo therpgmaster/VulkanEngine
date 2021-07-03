@@ -57,7 +57,7 @@ namespace EngineCore
 		vkDeviceWaitIdle(device.device()); // block until all resources freed
 	}
 
-	// temporary helper function, creates a 1x1x1 cube centered at offset
+	// creates a 1x1x1 cube centered at offset
 	/*std::unique_ptr<EngineModel> createCubeModel(EngineDevice& device, glm::vec3 offset, float size) {
 		float s = size / 2; // default half size is point five
 		std::vector<EngineModel::Vertex> vertices

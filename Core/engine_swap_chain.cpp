@@ -66,20 +66,12 @@ namespace EngineCore {
 	}
 
 	VkResult EngineSwapChain::acquireNextImage(uint32_t* imageIndex) {
-		vkWaitForFences(
-			device.device(),
-			1,
-			&inFlightFences[currentFrame],
-			VK_TRUE,
-			std::numeric_limits<uint64_t>::max());
+		vkWaitForFences(device.device(), 1, &inFlightFences[currentFrame], 
+						VK_TRUE, std::numeric_limits<uint64_t>::max());
 
-		VkResult result = vkAcquireNextImageKHR(
-			device.device(),
-			swapChain,
-			std::numeric_limits<uint64_t>::max(),
-			imageAvailableSemaphores[currentFrame],  // must be a not signaled semaphore
-			VK_NULL_HANDLE,
-			imageIndex);
+		VkResult result = vkAcquireNextImageKHR(device.device(), swapChain, 
+						std::numeric_limits<uint64_t>::max(), imageAvailableSemaphores[currentFrame],  /* must be a non-signaled semaphore */
+						VK_NULL_HANDLE,imageIndex);
 
 		return result;
 	}
