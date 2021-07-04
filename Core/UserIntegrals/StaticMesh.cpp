@@ -50,7 +50,6 @@ namespace EngineCore
 
 	void StaticMesh::makeCubeMesh() 
 	{
-		// creates a simple cube mesh
 		float s = 0.5f; // default 0.5 (size 1)
 		std::vector<Vertex> vertices
 		{

@@ -2,7 +2,7 @@
 
 #include "ActorComponent.h"
 
-// a virtual camera, not necessarily associated with an actor, thus owner might be null
+/* a virtual camera, not necessarily associated with an actor, thus owner might be null */
 class CameraComponent : public ActorComponent
 {
 public:

@@ -37,6 +37,7 @@ namespace EngineCore
 		void bind(VkCommandBuffer commandBuffer);
 		void draw(VkCommandBuffer commandBuffer);
 
+		// creates a simple cube mesh
 		void makeCubeMesh();
 
 	private:
