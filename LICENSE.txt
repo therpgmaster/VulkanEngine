@@ -10,6 +10,7 @@ Parts of the included code may fall under the MIT License,
 licensors for such parts are listed below, followed by the MIT License.
 Copyright (c) 2020 Brendan Galea
 Copyright (c) 2017 Kyle Halladay
+Copyright (c) 2017 Sean Barrett (STB - MIT/Public Domain)
 MIT License
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
