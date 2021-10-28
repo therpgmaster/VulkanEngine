@@ -1,4 +1,4 @@
-#include "engine_render_system.h"
+#include "mesh_rendersys.h"
 
 #include "UserIntegrals/CameraComponent.h"
 
@@ -21,18 +21,61 @@ namespace EngineCore
 		alignas(16) glm::vec3 color; // data to gpu must be aligned to multiples of 16
 	};
 
-	EngineRenderSystem::EngineRenderSystem(EngineDevice& deviceIn, VkRenderPass renderPass) : device{deviceIn}
+	MeshRenderSystem::MeshRenderSystem(EngineDevice& deviceIn, VkRenderPass renderPass) : device{deviceIn}
 	{
-		createPipelineLayout();
-		createPipeline(renderPass);
+		//createPipelineLayout();
+		//createPipeline(renderPass);
 	}
 
-	EngineRenderSystem::~EngineRenderSystem()
+	MeshRenderSystem::~MeshRenderSystem()
 	{
-		vkDestroyPipelineLayout(device.device(), pipelineLayout, nullptr);
+		//vkDestroyPipelineLayout(device.device(), pipelineLayout, nullptr);
 	}
 
-	void EngineRenderSystem::createPipelineLayout()
+	void MeshRenderSystem::renderMeshes(VkCommandBuffer commandBuffer, std::vector<StaticMesh*>& meshes,
+		CameraComponent* camera, const float& deltaTimeSeconds, float time, InputSystem* inputSysPtr)
+	{
+		for (auto* mesh : meshes)
+		{
+			if (mesh == nullptr || mesh->getMaterial() == nullptr) continue;
+			
+			mesh->getMaterial()->bindToCommandBuffer(commandBuffer); // bind material-specific shading pipeline
+
+			SimplePushConstantData push{};
+
+			push.color = mesh->color;
+			// spin 3D primitive
+			float spinRate = 0.0f;
+			mesh->transform.rotation.y = glm::mod(mesh->transform.rotation.y + (spinRate * deltaTimeSeconds), glm::two_pi<float>());
+			mesh->transform.rotation.x = glm::mod(mesh->transform.rotation.x + ((spinRate / 2.f) * deltaTimeSeconds), glm::two_pi<float>());
+
+			if (camera == nullptr) { throw std::runtime_error("renderEngineObjects null camera pointer"); }
+			// camera rotation
+			float mdx = inputSysPtr->getMouseDelta().x;
+			float mdy = inputSysPtr->getMouseDelta().y;
+			glm::vec3 mrd{ 0.f, mdy, mdx };
+			camera->transform.rotation += (mrd * 0.001f);
+			// camera translation
+			glm::vec3 insysVec{ inputSysPtr->getAxisValue(0), -inputSysPtr->getAxisValue(1), inputSysPtr->getAxisValue(2) };
+			camera->transform.translation += insysVec * 85.f * deltaTimeSeconds;
+
+			// the view matrix and mesh transform matrix are in world space
+			glm::mat4 projectionMatrix = camera->getProjectionMatrix();
+			glm::mat4 viewMatrix = camera->getViewMatrix();
+			glm::mat4 meshMatrix =  mesh->transform.mat4();
+			push.transform = projectionMatrix * viewMatrix * meshMatrix;
+
+			vkCmdPushConstants(commandBuffer, mesh->getMaterial()->getPipelineLayout(),
+				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+				0, sizeof(SimplePushConstantData), &push);
+
+			// record mesh draw command
+			mesh->bind(commandBuffer);
+			mesh->draw(commandBuffer);
+		}
+	}
+
+	/*void MeshRenderSystem::createPipelineLayout()
 	{
 		VkPushConstantRange pushConstRange{};
 		pushConstRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -49,7 +92,7 @@ namespace EngineCore
 		{ throw std::runtime_error("failed to create pipeline layout"); }
 	}
 
-	void EngineRenderSystem::createPipeline(VkRenderPass renderPass)
+	void MeshRenderSystem::createPipeline(VkRenderPass renderPass, const char* vertexShaderPath, const char* fragmentShaderPath)
 	{
 		assert(pipelineLayout != nullptr && "tried to create pipeline with uninitialized layout");
 		PipelineConfig pipelineConfig{};
@@ -58,10 +101,10 @@ namespace EngineCore
 		pipelineConfig.pipelineLayout = pipelineLayout;
 		pipeline = std::make_unique<EnginePipeline>(device, pipelineConfig,
 			"G:/VulkanDev/VulkanEngine/Core/Shaders/shader.vert.spv",
-			"G:/VulkanDev/VulkanEngine/Core/Shaders/shader.frag.spv"); // SPIR-V shader files (hardcoded paths!)
+			"G:/VulkanDev/VulkanEngine/Core/Shaders/shader.frag.spv"); // read SPIR-V shader files
 	}
 
-	void EngineRenderSystem::renderEngineObjects(VkCommandBuffer commandBuffer, std::vector<StaticMesh*>& meshes,
+	void MeshRenderSystem::renderMeshes(VkCommandBuffer commandBuffer, std::vector<StaticMesh*>& meshes,
 										CameraComponent* camera, const float& deltaTimeSeconds, float time, std::vector<bool> wasdrf)
 	{
 		pipeline->bind(commandBuffer);
@@ -106,10 +149,9 @@ namespace EngineCore
 				0, sizeof(SimplePushConstantData), &push);
 			mesh->bind(commandBuffer);
 			mesh->draw(commandBuffer);
-		}
-	}
+		}*/
 
-	glm::mat4 EngineRenderSystem::lerpMat4(float t, glm::mat4 matA, glm::mat4 matB) 
+	glm::mat4 MeshRenderSystem::lerpMat4(float t, glm::mat4 matA, glm::mat4 matB) 
 	{
 		glm::mat4 matOut{};
 

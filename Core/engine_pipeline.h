@@ -8,6 +8,7 @@ namespace EngineCore
 {
 	struct PipelineConfig 
 	{
+		PipelineConfig() = default;
 		PipelineConfig(const PipelineConfig&) = delete;
 		PipelineConfig& operator=(const PipelineConfig&) = delete;
 
@@ -36,7 +37,7 @@ namespace EngineCore
 		EnginePipeline(const EnginePipeline&) = delete;
 		EnginePipeline& operator=(const EnginePipeline&) = delete;
 
-		// bind the pipeline to a command buffer
+		// binds this pipeline object to a command buffer
 		void bind(VkCommandBuffer commandBuffer);
 
 		// sets the cfg param to the default graphics pipeline configuration settings

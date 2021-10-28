@@ -1,13 +1,9 @@
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-Parts of the included code may fall under the MIT License, 
-licensors for such parts are listed below, followed by the MIT License.
+Part(s) of the Software may have previously been distributed and/or published under 
+the MIT License which shall continue to apply for all such parts. 
+Additionally, the last half of the MIT License (which is featured in all-capital letters) 
+shall apply to the Software in its entirety without exception.
+Licensors for parts exclusively licensed under the MIT License are listed below, 
+followed by the full MIT License text.
 Copyright (c) 2020 Brendan Galea
 Copyright (c) 2017 Kyle Halladay
 Copyright (c) 2017 Sean Barrett (STB - MIT/Public Domain)
@@ -20,5 +16,16 @@ copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions: 
 The above copyright notice and this permission notice shall be included 
 in all copies or substantial portions of the Software. 
-(See the full MIT license terms at: http://opensource.org/licenses/MIT)
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE. 
+End of MIT License.
+
+
+
+
 

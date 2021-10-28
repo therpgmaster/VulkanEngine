@@ -34,7 +34,7 @@ namespace EngineCore
 
 		// returns a command buffer object for writing commands to
 		VkCommandBuffer beginFrame();
-		// called to finalize the frame, executing the current command buffer
+		// submit command buffer to finalize the frame
 		void endFrame();
 		void beginSwapchainRenderPass(VkCommandBuffer commandBuffer);
 		void endSwapchainRenderPass(VkCommandBuffer commandBuffer);

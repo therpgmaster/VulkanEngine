@@ -35,9 +35,7 @@ namespace EngineCore
 #else
 		const bool enableValidationLayers = true;
 #endif
-		// device object constructor
 		EngineDevice(EngineWindow& window);
-		// device object destructor
 		~EngineDevice();
 
 		// Not copyable or movable
@@ -57,6 +55,8 @@ namespace EngineCore
 		QueueFamilyIndices findPhysicalQueueFamilies() { return findQueueFamilies(physicalDevice); }
 		VkFormat findSupportedFormat(
 			const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+		// remember to compare against VK_NULL_HANDLE
+		VkPhysicalDevice& getPhysicalDevice() { return physicalDevice; }
 
 		// Buffer Helper Functions
 		void createBuffer(
@@ -70,12 +70,16 @@ namespace EngineCore
 		void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 		void copyBufferToImage(
 			VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t layerCount);
-
+		// creates a vulkan image object
 		void createImageWithInfo(
 			const VkImageCreateInfo& imageInfo,
 			VkMemoryPropertyFlags properties,
 			VkImage& image,
 			VkDeviceMemory& imageMemory);
+		// imports and initializes an image texture from disk
+		void importImageFromFile(const char* path);
+		// takes a VkImage and transitions its layout
+		void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
 
 		VkPhysicalDeviceProperties properties;
 
@@ -104,7 +108,7 @@ namespace EngineCore
 		VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 		EngineWindow& window;
 		VkCommandPool commandPool;
-
+		// logical device
 		VkDevice device_;
 		VkSurfaceKHR surface_;
 		VkQueue graphicsQueue_;

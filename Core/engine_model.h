@@ -11,6 +11,7 @@
 
 namespace EngineCore 
 {
+	// TODO: DEPRECATED IN FAVOR OF STATIC MESH
 	class EngineModel 
 	{
 	public:

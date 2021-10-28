@@ -27,7 +27,9 @@ namespace EngineCore
 		windowPtr = glfwCreateWindow(width, height, wndName.c_str(), nullptr, nullptr);
 		glfwSetWindowUserPointer(windowPtr, this);
 		glfwSetFramebufferSizeCallback(windowPtr, framebufferResizedCallback); // bind framebufferResizedCallback to resize event
-		glfwSetKeyCallback(windowPtr, keyPressedCallback);
+		// subscribe to glfw input events
+		glfwSetKeyCallback(getGLFWwindow(), keypressCallbackHandler);
+		glfwSetCursorPosCallback(getGLFWwindow(), mousePosCallbackHandler);
 	}
 
 	void EngineWindow::createWindowSurface(VkInstance inst, VkSurfaceKHR* surface)
@@ -46,30 +48,21 @@ namespace EngineCore
 		thisWindow->height = height;
 	}
 
-	void EngineWindow::keyPressedCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+	void EngineWindow::keypressCallbackHandler(GLFWwindow* window, int key, int scancode, int action, int mods) 
 	{
-		auto thisWindow = reinterpret_cast<EngineWindow*>(glfwGetWindowUserPointer(window));
-		// TODO: make a more elegant system for registering keyboard input
-		if (thisWindow->tmpApplicationObjPtr == nullptr) { return; }
-		switch (key) {
-		case 87:
-			thisWindow->tmpApplicationObjPtr->keyWPressed = true;
-			break;
-		case 65:
-			thisWindow->tmpApplicationObjPtr->keyAPressed = true;
-			break;
-		case 83:
-			thisWindow->tmpApplicationObjPtr->keySPressed = true;
-			break;
-		case 68:
-			thisWindow->tmpApplicationObjPtr->keyDPressed = true;
-			break;
-		case 82:
-			thisWindow->tmpApplicationObjPtr->keyRPressed = true;
-			break;
-		case 70:
-			thisWindow->tmpApplicationObjPtr->keyFPressed = true;
-					}
+		/*	since this is a static function as required by glfw, we need to retrieve
+			our InputSystem object through the glfw "window user pointer" as follows */
+		EngineWindow* wp = reinterpret_cast<EngineWindow*>(glfwGetWindowUserPointer(window));
+		assert(wp != NULL && "failed to process input, glfw window user pointer not set");
+		wp->input.keyPressedCallback(key, scancode, action, mods); // inform the input system
+	}
+
+	void EngineWindow::mousePosCallbackHandler(GLFWwindow* window, double x, double y)
+	{
+		EngineWindow* wp = reinterpret_cast<EngineWindow*>(glfwGetWindowUserPointer(window));
+		assert(wp != NULL && "failed to process input, glfw window user pointer not set");
+		
+		wp->input.mousePosUpdatedCallback(x, y); // send updated mouse coords to input system
 	}
 
 } // namespace

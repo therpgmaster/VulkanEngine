@@ -48,6 +48,7 @@ public:
 			},
 			{translation.x, translation.y, translation.z, 1.0f} };
 	}
+	// TODO: the below function is probably not used for anything
 	glm::mat4 mat4NatSys()
 	{
 		// Matrix corresponds to Translate * Rz * Rx * Ry (different rotation order)

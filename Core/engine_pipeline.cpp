@@ -1,5 +1,5 @@
 #include "engine_pipeline.h"
-#include "engine_model.h"
+#include "UserIntegrals/StaticMesh.h"
 
 // std
 #include <fstream>
@@ -50,8 +50,8 @@ namespace EngineCore
 		shaderStages[1].pNext = nullptr;
 		shaderStages[1].pSpecializationInfo = nullptr;
 
-		auto bindingDescriptions = EngineModel::Vertex::getBindingDescriptions();
-		auto attributeDescriptions = EngineModel::Vertex::getAttributeDescriptions();
+		auto bindingDescriptions = StaticMesh::Vertex::getBindingDescriptions();
+		auto attributeDescriptions = StaticMesh::Vertex::getAttributeDescriptions();
 		VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 		vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 		vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
@@ -86,6 +86,7 @@ namespace EngineCore
 
 	void EnginePipeline::bind(VkCommandBuffer commandBuffer)
 	{
+		/* a pipeline binding affects subsequent commands until a different pipeline is bound */
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 	}
 

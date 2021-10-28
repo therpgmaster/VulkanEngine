@@ -1,7 +1,8 @@
 #include "application.h"
-#include "engine_render_system.h"
+#include "mesh_rendersys.h"
 
 #include "UserIntegrals/CameraComponent.h"
+#include "materials.h"
 
 #include <stdexcept>
 #include <array>
@@ -25,36 +26,57 @@ namespace EngineCore
 
 	void EngineApplication::startExecution()
 	{
-		EngineRenderSystem renderSys{ device, renderer.getSwapchainRenderPass() };
+		MeshRenderSystem renderSys{ device, renderer.getSwapchainRenderPass() };
+		// TODO: hardcoded paths
+		ShaderFilePaths shaders("G:/VulkanDev/VulkanEngine/Core/Shaders/shader.vert.spv",
+								"G:/VulkanDev/VulkanEngine/Core/Shaders/shader.frag.spv");
+		MaterialCreateInfo matInfo(device, renderer.getSwapchainRenderPass(), shaders);
+		if (loadedMeshes.size() > 0 && loadedMeshes[0]) { for (auto* m : loadedMeshes) { m->setMaterial(matInfo); } }
+		else { throw std::runtime_error("could not access loaded mesh"); }
+		
 		// TODO: this is a temporary single-camera setup, remember that we also delete this object below
-		CameraComponent* camera = new CameraComponent(45.f, 0.01f, 100.f); 
-		window.setAppPtr(this); // temporary input system (see engine window class)
+		CameraComponent* camera = new CameraComponent(45.f, 0.8f, 10.f);
 
-		// window event loop
+		// input setup
+		window.input.captureMouseCursor(true);
+		setupDefaultInputs();
+
 		double deltaTime = 0.0;
 		double elapsedTime = 0.0;
+				bool materialSwitchTestDone = false; // only do the temporary test (below) once
+
+		// window event loop (every frame)
 		while (!window.getCloseWindow()) 
 		{
 			measureTiming();
 			elapsedTime = elapsedTime + deltaTime;
 			//std::cout << " FPS " << getFps(deltaTime) << " time(s) " << elapsedTime << "\n";
-
-			resetPressedKeys(); // temporary input system
-			glfwPollEvents();
+			window.input.resetInputValues(); // set all input values to zero
+			window.pollEvents();
 			if (auto commandBuffer = renderer.beginFrame()) 
 			{
 				renderer.beginSwapchainRenderPass(commandBuffer);
 				// render meshes
-				renderSys.renderEngineObjects(commandBuffer, loadedMeshes, camera, deltaTime, elapsedTime, 
-								std::vector<bool>{keyWPressed, keyAPressed, keySPressed, keyDPressed, keyRPressed, keyFPressed});
+				renderSys.renderMeshes(commandBuffer, loadedMeshes, camera, deltaTime, elapsedTime, &window.input);
 				renderer.endSwapchainRenderPass(commandBuffer);
-				renderer.endFrame();
-				camera->aspectRatio = window.getAspectRatio(); // TODO: ideally should only be updated when window was resized
+				renderer.endFrame(); // submit command buffer
+				camera->aspectRatio = window.getAspectRatio();
 			}
 			deltaTime = getTiming();
+
+			// temporary test of materials system (TODO)
+			if ((false) && elapsedTime > 1.5 && elapsedTime < 1.8 && !materialSwitchTestDone)
+			{
+				ShaderFilePaths sp_2("G:/VulkanDev/VulkanEngine/Core/Shaders/shader.vert.spv",
+					"G:/VulkanDev/VulkanEngine/Core/Shaders/shader2test.frag.spv");
+				MaterialCreateInfo matInfo_2(device, renderer.getSwapchainRenderPass(), sp_2);
+				if (loadedMeshes.size() > 0 && loadedMeshes[0]) { loadedMeshes[0]->setMaterial(matInfo_2); }
+				materialSwitchTestDone = true;
+			}
+
 		}
 		delete camera;
-		vkDeviceWaitIdle(device.device()); // block until all resources freed
+		vkDeviceWaitIdle(device.device()); // block until GPU finished
 	}
 
 	// creates a 1x1x1 cube centered at offset
@@ -119,7 +141,11 @@ namespace EngineCore
 
 	void EngineApplication::loadActors() 
 	{
-		loadedMeshes.push_back(std::move(new StaticMesh(device)));
+		StaticMesh::MeshBuilder builder{};
+		builder.loadFromFile("G:/VulkanDev/VulkanEngine/Core/Meshes/axis2.obj"); // TODO: hardcoded path
+		loadedMeshes.push_back(new StaticMesh(device, builder));
+		loadedMeshes.push_back(new StaticMesh(device, builder));
+		loadedMeshes[1]->transform.translation.z = 1.0f;
 
 		/*std::shared_ptr<EngineModel> cubemodel = createCubeModel(device, { 0.f, 0.f, 0.f }, 1.f);
 		auto cube = EngineObject::createObject();
@@ -136,6 +162,19 @@ namespace EngineCore
 		cube2.transform.scale = { 0.2f, 0.2f, 0.2f };
 		cube2.transform.rotation = { 45.f, 0.f, 0.f };
 		engineObjects.push_back(std::move(cube2));*/
+	}
+
+	void EngineApplication::setupDefaultInputs()
+	{
+		assert(&window.input && "error setting up default input bindings");
+		InputSystem& ins = window.input;
+
+		uint32_t fwdAxisIndex = ins.addBinding(KeyBinding(GLFW_KEY_W, 1.f), "kbForwardAxis");
+		ins.addBinding(KeyBinding(GLFW_KEY_S, -1.f), fwdAxisIndex);
+		uint32_t rightAxisIndex = ins.addBinding(KeyBinding(GLFW_KEY_D, 1.f), "kbRightAxis");
+		ins.addBinding(KeyBinding(GLFW_KEY_A, -1.f), rightAxisIndex);
+		uint32_t upAxisIndex = ins.addBinding(KeyBinding(GLFW_KEY_R, 1.f), "kbUpAxis");
+		ins.addBinding(KeyBinding(GLFW_KEY_F, -1.f), upAxisIndex);
 	}
 
 } // namespace

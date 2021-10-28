@@ -3,6 +3,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h> // GL Framework (GLFW) used to create an engine window
 #include <string>
+#include "Input.h"
 
 namespace EngineCore
 {
@@ -24,18 +25,25 @@ namespace EngineCore
 		float getAspectRatio() { return width / height; }
 		bool wasWindowResized() { return framebufferResized; }
 		void resetWindowResizedFlag() { framebufferResized = false; }
+		GLFWwindow* getGLFWwindow() { return windowPtr; }
 
 		// creates the surface that acts as an interface between the engine and vulkan
 		void createWindowSurface(VkInstance inst, VkSurfaceKHR* surface);
 
-		class EngineApplication* tmpApplicationObjPtr = nullptr; // TODO: only used to report keyboard inputs - temporary solution
-		void setAppPtr(EngineApplication* ptr) { tmpApplicationObjPtr = ptr; }
+		void pollEvents() { glfwPollEvents(); }
+
+		// middleman function that forwards glfw events to the input system
+		static void keypressCallbackHandler(GLFWwindow* window, int key, int scancode, int action, int mods);
+		// middleman function for recording glfw mouse position updates
+		static void mousePosCallbackHandler(GLFWwindow* window, double x, double y);
+
+		// mouse/keyboard events
+		InputSystem input{ this };
 
 	private:
 		// window initialization using GLFW (on construct)
 		void initWindow();
 		static void framebufferResizedCallback(GLFWwindow* window, int width, int height);
-		static void keyPressedCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
 		int width;
 		int height;
