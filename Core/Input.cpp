@@ -3,6 +3,8 @@
 
 #include <cassert>
 
+#include <iostream>
+
 namespace EngineCore
 {
 
@@ -23,8 +25,9 @@ namespace EngineCore
 		assert((parentWindow && parentWindow->getGLFWwindow()) && "input system initialized with no window reference");
 	}
 
-	void InputSystem::keyPressedCallback(const int& key, const int& scancode, const int& action, const int& mods)
+	/*void InputSystem::keyPressedCallback(const int& key, const int& scancode, const int& action, const int& mods)
 	{
+		
 		if (bindings.empty()) { return; }
 		for (auto& kb : bindings)
 		{
@@ -36,7 +39,7 @@ namespace EngineCore
 				if (kb.consumesKeyEvents) { return; }
 			}
 		}
-	}
+	}*/
 
 	void InputSystem::mousePosUpdatedCallback(const double& x, const double& y) 
 	{
@@ -51,7 +54,7 @@ namespace EngineCore
 		uint32_t axisIndex = axisValues.size();
 		if (newAxisName == "NONE") { axisName = "Axis_" + axisIndex; }
 		axisValues.push_back(InputAxis(axisName)); // add input axis
-		binding.setAxisIndex(axisIndex);
+		binding.axisIndex = axisIndex;
 		bindings.push_back(binding); // add binding
 		return axisIndex;
 	}
@@ -64,7 +67,7 @@ namespace EngineCore
 		}
 		else 
 		{
-			binding.setAxisIndex(axisIndex);
+			binding.axisIndex = axisIndex;
 			bindings.push_back(binding);
 		}
 	}
@@ -83,8 +86,8 @@ namespace EngineCore
 
 	void InputSystem::resetInputValues() 
 	{
-		for (auto& axis : axisValues) { axis.value = 0.f; }
 		mouseDelta = { 0.0 };
+		//for (auto& axis : axisValues) { axis.value = 0.f; }
 	}
 
 	void InputSystem::captureMouseCursor(const bool& capture)
@@ -104,6 +107,25 @@ namespace EngineCore
 			glfwSetInputMode(gw, GLFW_RAW_MOUSE_MOTION, GLFW_FALSE);
 			glfwSetInputMode(gw, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 		}
+	}
+
+	void InputSystem::updateBoundInputs()
+	{
+		if (bindings.empty() || axisValues.empty()) { return; }
+
+		std::vector<uint32_t> unpressed;
+
+		for (auto& binding : bindings) 
+		{
+			int32_t key = binding.getKey();
+			if (key <= -1 || binding.axisIndex <= -1) { continue; }
+
+			float v = glfwGetKey(parentWindow->getGLFWwindow(), key) == GLFW_PRESS 
+						? binding.axisValueInfluence : 0.f;
+			axisValues[binding.axisIndex].influences.push_back(v);
+		}
+
+		for (auto& a : axisValues) { a.applyInfluences(); }
 	}
 
 } // namespace

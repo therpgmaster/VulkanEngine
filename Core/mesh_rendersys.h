@@ -62,19 +62,6 @@ namespace EngineCore
 			return projection;
 		}
 
-		// TODO: not really necessary, so far
-		static glm::mat4 scaleMatrix(float s)
-		{
-			glm::vec3 v = { s, s, s };
-			return glm::mat4
-			{
-				v.x,	0.f,	0.f,	0.f,
-				0.f,	v.y,	0.f,	0.f,
-				0.f,	0.f,	v.z,	0.f,
-				0.f,	0.f,	0.f,	1.f,
-			};
-		}
-
 		static glm::mat4 lerpMat4(float t, glm::mat4 matA, glm::mat4 matB);
 
 		static float lerp(const double& a, const double& b, const double& t)

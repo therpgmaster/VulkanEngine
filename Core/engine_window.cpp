@@ -54,7 +54,7 @@ namespace EngineCore
 			our InputSystem object through the glfw "window user pointer" as follows */
 		EngineWindow* wp = reinterpret_cast<EngineWindow*>(glfwGetWindowUserPointer(window));
 		assert(wp != NULL && "failed to process input, glfw window user pointer not set");
-		wp->input.keyPressedCallback(key, scancode, action, mods); // inform the input system
+		//wp->input.keyPressedCallback(key, scancode, action, mods); // inform the input system
 	}
 
 	void EngineWindow::mousePosCallbackHandler(GLFWwindow* window, double x, double y)

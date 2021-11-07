@@ -36,6 +36,7 @@ namespace EngineCore
 		
 		// TODO: this is a temporary single-camera setup, remember that we also delete this object below
 		CameraComponent* camera = new CameraComponent(45.f, 0.8f, 10.f);
+		camera->transform.rotation = { 0.f, Transform3D::degToRad(-90.f), Transform3D::degToRad(-90.f) };
 
 		// input setup
 		window.input.captureMouseCursor(true);
@@ -52,6 +53,7 @@ namespace EngineCore
 			elapsedTime = elapsedTime + deltaTime;
 			//std::cout << " FPS " << getFps(deltaTime) << " time(s) " << elapsedTime << "\n";
 			window.input.resetInputValues(); // set all input values to zero
+			window.input.updateBoundInputs(); // get input states
 			window.pollEvents();
 			if (auto commandBuffer = renderer.beginFrame()) 
 			{
@@ -142,10 +144,8 @@ namespace EngineCore
 	void EngineApplication::loadActors() 
 	{
 		StaticMesh::MeshBuilder builder{};
-		builder.loadFromFile("G:/VulkanDev/VulkanEngine/Core/Meshes/axis2.obj"); // TODO: hardcoded path
+		builder.loadFromFile("G:/VulkanDev/VulkanEngine/Core/Meshes/x_y_.obj"); // TODO: hardcoded paths
 		loadedMeshes.push_back(new StaticMesh(device, builder));
-		loadedMeshes.push_back(new StaticMesh(device, builder));
-		loadedMeshes[1]->transform.translation.z = 1.0f;
 
 		/*std::shared_ptr<EngineModel> cubemodel = createCubeModel(device, { 0.f, 0.f, 0.f }, 1.f);
 		auto cube = EngineObject::createObject();
@@ -167,14 +167,18 @@ namespace EngineCore
 	void EngineApplication::setupDefaultInputs()
 	{
 		assert(&window.input && "error setting up default input bindings");
-		InputSystem& ins = window.input;
 
-		uint32_t fwdAxisIndex = ins.addBinding(KeyBinding(GLFW_KEY_W, 1.f), "kbForwardAxis");
-		ins.addBinding(KeyBinding(GLFW_KEY_S, -1.f), fwdAxisIndex);
-		uint32_t rightAxisIndex = ins.addBinding(KeyBinding(GLFW_KEY_D, 1.f), "kbRightAxis");
-		ins.addBinding(KeyBinding(GLFW_KEY_A, -1.f), rightAxisIndex);
-		uint32_t upAxisIndex = ins.addBinding(KeyBinding(GLFW_KEY_R, 1.f), "kbUpAxis");
-		ins.addBinding(KeyBinding(GLFW_KEY_F, -1.f), upAxisIndex);
+		InputSystem& inputSys = window.input;
+
+		// add binding for forwards (and backwards) movement
+		uint32_t fwdAxisIndex = inputSys.addBinding(KeyBinding(GLFW_KEY_W, 1.f), "kbForwardAxis");
+		inputSys.addBinding(KeyBinding(GLFW_KEY_S, -1.f), fwdAxisIndex);
+		// right/left
+		uint32_t rightAxisIndex = inputSys.addBinding(KeyBinding(GLFW_KEY_D, 1.f), "kbRightAxis");
+		inputSys.addBinding(KeyBinding(GLFW_KEY_A, -1.f), rightAxisIndex);
+		// up/down
+		uint32_t upAxisIndex = inputSys.addBinding(KeyBinding(GLFW_KEY_R, 1.f), "kbUpAxis");
+		inputSys.addBinding(KeyBinding(GLFW_KEY_F, -1.f), upAxisIndex);
 	}
 
 } // namespace

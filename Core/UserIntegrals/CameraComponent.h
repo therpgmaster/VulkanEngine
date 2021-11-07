@@ -30,11 +30,7 @@ public:
 	float vFOV = 45.f;
 	float aspectRatio = 1.333f;
 
-	void setFOVh(const float& deg) 
-	{
-		const float rad = deg * 0.0174533f;
-		vFOV = rad;
-	}
+	void setFOVh(const float& deg) { vFOV = (float)Transform3D::degToRad((float)deg); }
 
 	glm::mat4 getProjectionMatrix() 
 	{
@@ -59,6 +55,27 @@ public:
 		return mat;
 		*/
 
+		// lve: up = -Y,  right = +X,  forward = +Z
+		const float tanHalfFovy = tan(vFOV / 2.f);
+		float x = 1.f / (aspectRatio * tanHalfFovy);
+		float y = 1.f / (tanHalfFovy);
+		float z = farPlane / (farPlane - nearPlane);
+		float w = -(farPlane * nearPlane) / (farPlane - nearPlane);
+
+		glm::mat4 lveMat
+		{
+			x,   0.f, 0.f, 0.f,
+			0.f, y,   0.f, 0.f,
+			0.f, 0.f, z,   1.f,
+			0.f, 0.f, w,   0.f,
+		};
+
+		return lveMat;
+	}
+
+	glm::mat4 getProjectionMatrixBlender() 
+	{
+		// for X-forward Z-up: rotate camera 90 deg counter-clockwise on Y, 90 deg clockwise on X
 		const float b = nearPlane * tan(vFOV / 2);
 		const float X_d = (aspectRatio * b) * 2;
 		const float Y_d = -b * 2;
@@ -68,7 +85,7 @@ public:
 		const float y = nearPlane * 2.f / Y_d;
 		const float A = -(farPlane + nearPlane) / Z_d;
 		const float B = (-2.f * nearPlane * farPlane) / Z_d;
-		
+
 		glm::mat4 mat
 		{
 			x,   0.f, 0.f,  0.f, // X
@@ -85,8 +102,7 @@ public:
 		else { return transform.mat4(); }
 	}
 
-	// returns the camera projection matrix
-	glm::mat4 getProjectionMatrixLEGACY()
+	glm::mat4 getProjectionMatrixAlt()
 	{
 		const float n = nearPlane;
 		const float f = farPlane;
@@ -121,7 +137,7 @@ public:
 		float A = f / (f - n);
 		float B = -(f * n) / (f - n);
 
-		// LVE: up = -Y,  right = +X,  forward = +Z
+		
 
 		glm::mat4 pmatrix
 		{
@@ -135,7 +151,7 @@ public:
 	}
 
 	// alternate projection method (flips an axis, mismatch with blender)
-	glm::mat4 getProjectionMatrixLEGACYAlt()
+	glm::mat4 getProjectionMatrixCookbook()
 	{
 		const float n = nearPlane;
 		const float f = farPlane;
