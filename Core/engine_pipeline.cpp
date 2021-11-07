@@ -126,8 +126,8 @@ namespace EngineCore
 		cfg.rasterizationInfo.rasterizerDiscardEnable = VK_FALSE;
 		cfg.rasterizationInfo.polygonMode = VK_POLYGON_MODE_FILL;// polygon render mode
 		cfg.rasterizationInfo.lineWidth = 1.0f;
-		cfg.rasterizationInfo.cullMode = VK_CULL_MODE_NONE; // backface culling
-		cfg.rasterizationInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
+		cfg.rasterizationInfo.cullMode = VK_CULL_MODE_BACK_BIT; // backface culling
+		cfg.rasterizationInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 		cfg.rasterizationInfo.depthBiasEnable = VK_FALSE;
 		cfg.rasterizationInfo.depthBiasConstantFactor = 0.0f;  // Optional
 		cfg.rasterizationInfo.depthBiasClamp = 0.0f;           // Optional
