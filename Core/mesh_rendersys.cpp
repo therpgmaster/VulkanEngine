@@ -50,48 +50,44 @@ namespace EngineCore
 			mesh->transform.rotation.y = glm::mod(mesh->transform.rotation.y + (spinRate * deltaTimeSeconds), glm::two_pi<float>());
 			mesh->transform.rotation.x = glm::mod(mesh->transform.rotation.x + ((spinRate / 2.f) * deltaTimeSeconds), glm::two_pi<float>());
 
-			if (camera != nullptr) 
+			/*if (camera != nullptr)
 			{
 				// camera rotation
-				const double x = Transform3D::degToRad(inputSysPtr->getMouseDelta().x);
-				const double y = Transform3D::degToRad(inputSysPtr->getMouseDelta().y);
-				camera->transform.rotation += glm::vec3{ -x, y, 0.0 } * 0.03f;
+				//camera->transform.rotation += glm::vec3{ -x, y, 0.0 } * 0.03f;
+				glm::vec3 rot = { -inputSysPtr->getMouseDelta().x, inputSysPtr->getMouseDelta().y, 0.f};
+				rot = { Transform3D::degToRad(rot.x), Transform3D::degToRad(rot.y), 0.f };
+				camera->transform.rotation += rot * 0.03f;
+				auto x = camera->transform.rotation.x; auto y = camera->transform.rotation.y; auto z = camera->transform.rotation.z;
+				std::cout << "x: " << x << " y: " << y << " z: " << z << "\n \n \n";
 
-				float camrot_x = camera->transform.rotation.x;
-				float camrot_y = camera->transform.rotation.y;
-				float camrot_z = camera->transform.rotation.z;
+				// camera translation
+				glm::vec3 camFwdVec = camera->transform.getForwardVector();
+				float fwdInput = inputSysPtr->getAxisValue(0);
+				float constexpr epsilon = std::numeric_limits<float>::epsilon();
+				if ((glm::dot(camFwdVec, camFwdVec) > epsilon) && (fwdInput > epsilon || fwdInput < -epsilon))
+				{
+					camera->transform.translation += glm::normalize(camFwdVec) * (fwdInput * 1.2f * deltaTimeSeconds);
+				}
+				camera->transform.translation.y += -inputSysPtr->getAxisValue(1) * deltaTimeSeconds * 1.2f;
+				camera->transform.translation.z += inputSysPtr->getAxisValue(2) * deltaTimeSeconds * 1.2f;
 			}
 			else 
-			{ throw std::runtime_error("renderEngineObjects null camera pointer"); }
+			{ throw std::runtime_error("renderEngineObjects null camera pointer"); }*/
 
-			// camera translation
-			//glm::vec3 insysVec{ inputSysPtr->getAxisValue(0), -inputSysPtr->getAxisValue(1), inputSysPtr->getAxisValue(2) };
-			glm::vec3 camFwdInput = camera->transform.getForwardVector() * inputSysPtr->getAxisValue(0);
-			/*if (glm::dot(camFwdInput, camFwdInput) > std::numeric_limits<float>::epsilon())
-			{
-				camera->transform.translation += 85.f * glm::normalize(camFwdInput) * deltaTimeSeconds;
-			}*/
-			camera->transform.translation.x += inputSysPtr->getAxisValue(0) * deltaTimeSeconds;
-			camera->transform.translation.y += -inputSysPtr->getAxisValue(1) * deltaTimeSeconds;
-			camera->transform.translation.z += inputSysPtr->getAxisValue(2) * deltaTimeSeconds;
-			
+			auto lookInput = inputSysPtr->getMouseDelta();
+			auto mf = inputSysPtr->getAxisValue(0);
+			auto mr = inputSysPtr->getAxisValue(1);
+			auto mu = inputSysPtr->getAxisValue(2);
+			auto fwdVec = camera->moveInPlaneXZ(lookInput, mf, mr, mu, deltaTimeSeconds);
 
-			// TEST
-			const float testMovementRateDelta = 0.8f * deltaTimeSeconds;
-			/*if (time < 5.f)
-			{
-				mesh->transform.translation.x += testMovementRateDelta;
-			} else 
-			{
-				mesh->transform.translation.y += testMovementRateDelta;
-			}*/
-			
+			//std::cout << "x: " << lookInput.x << " y: " << lookInput.y << "\n \n";
 
 			// view matrix and mesh transform matrix
 			glm::mat4 projectionMatrix = camera->getProjectionMatrixBlender();
-			glm::mat4 viewMatrix = camera->getViewMatrix();
+			glm::mat4 viewMatrix = camera->getViewMatrix(true);
 			glm::mat4 meshMatrix =  mesh->transform.mat4();
-			push.transform = projectionMatrix * viewMatrix * meshMatrix;
+			glm::mat4 worldMatrix = CameraComponent::getWorldBasisMatrix();
+			push.transform = projectionMatrix * worldMatrix * viewMatrix * meshMatrix  ;
 
 			vkCmdPushConstants(commandBuffer, mesh->getMaterial()->getPipelineLayout(),
 				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,

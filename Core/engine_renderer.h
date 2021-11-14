@@ -31,6 +31,7 @@ namespace EngineCore
 			assert(isFrameStarted && "getFrameIndex failed, no frame in progress");
 			return currentFrameIndex;
 		}
+		float getAspectRatio() const { return swapchain->getExtentAspectRatio(); }
 
 		// returns a command buffer object for writing commands to
 		VkCommandBuffer beginFrame();

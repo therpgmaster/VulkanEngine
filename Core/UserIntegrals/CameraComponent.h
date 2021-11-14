@@ -96,10 +96,40 @@ public:
 		return mat;
 	}
 
-	glm::mat4 getViewMatrix(const bool& inverse = true)
+	glm::mat4 getViewMatrix(const bool& legacyMethod = false) 
 	{
-		if (inverse) { return glm::inverse(transform.mat4()); }
-		else { return transform.mat4(); }
+		if (legacyMethod) 
+		{
+			// using the camera's transform directly
+			return glm::inverse(transform.mat4());
+		}
+
+		const glm::vec3& position = transform.translation;
+		const glm::vec3& rotation = transform.rotation;
+		// calculate the view matrix based on rotation and position
+		const float c3 = glm::cos(rotation.x);
+		const float s3 = glm::sin(rotation.x);
+		const float c2 = glm::cos(rotation.y);
+		const float s2 = glm::sin(rotation.y);
+		const float c1 = glm::cos(rotation.z);
+		const float s1 = glm::sin(rotation.z);
+		const glm::vec3 u{ (c1 * c3 + s1 * s2 * s3), (c2 * s3), (c1 * s2 * s3 - c3 * s1) };
+		const glm::vec3 v{ (c3 * s1 * s2 - c1 * s3), (c2 * c3), (c1 * c3 * s2 + s1 * s3) };
+		const glm::vec3 w{ (c2 * s1), (-s2), (c1 * c2) };
+		glm::mat4 viewMatrix = glm::mat4{ 1.f };
+		viewMatrix[0][0] = u.x;
+		viewMatrix[1][0] = u.y;
+		viewMatrix[2][0] = u.z;
+		viewMatrix[0][1] = v.x;
+		viewMatrix[1][1] = v.y;
+		viewMatrix[2][1] = v.z;
+		viewMatrix[0][2] = w.x;
+		viewMatrix[1][2] = w.y;
+		viewMatrix[2][2] = w.z;
+		viewMatrix[3][0] = -glm::dot(u, position);
+		viewMatrix[3][1] = -glm::dot(v, position);
+		viewMatrix[3][2] = -glm::dot(w, position);
+		return viewMatrix;
 	}
 
 	glm::mat4 getProjectionMatrixAlt()
@@ -166,6 +196,62 @@ public:
 			0.0f, 0.0f, -(f * n) / (f - n), 1.0f 
 		};
 		return pmatrix;
+	}
+
+	glm::vec3 moveInPlaneXZ(const Vector2D<double>& lookInput, const float& moveFwd, const float& moveRight, const float& moveUp, const float& deltaTime)
+	{
+		float lookSpeed = 3.8f;
+		float moveSpeed = 0.003f;
+
+		float yawInput = lookInput.x != 0 ? lookInput.x / abs(lookInput.x) : 0.f; 
+		float pitchInput = lookInput.y != 0 ? lookInput.y / abs(lookInput.y) : 0.f;
+		transform.rotation += lookSpeed * deltaTime * glm::vec3{ 0.f, pitchInput, -yawInput }; //glm::vec3{ 0.0, -lookInput.y, -lookInput.x };
+
+		// limit pitch values to exactly 85 degrees
+		transform.rotation.y = glm::clamp(transform.rotation.y, 
+				(float)Transform3D::degToRad(-85.f), (float)Transform3D::degToRad(85.f));
+		// prevent overflow from continous yawing
+		transform.rotation.z = glm::mod(transform.rotation.z, glm::two_pi<float>());
+
+		float pitch = transform.rotation.y;
+		float yaw = transform.rotation.z; // lve: y
+		// lve: { sin(yaw), 0.f, cos(yaw) } new: //-sin(yaw), tan(pitch) (prev. sin), -cos(yaw)
+		//glm::vec3 forwardDir { -sin(yaw), tan(pitch), -cos(yaw) }; this applies to "vulkan-space" coordinates, not the custom system
+		glm::vec3 forwardDir{ -sin(yaw), tan(pitch), -cos(yaw) };
+		const glm::vec3 upDir{ 0.f, 0.f, 1.f };
+		const glm::vec3 rightDir = glm::normalize(glm::cross(glm::normalize(upDir), glm::normalize(forwardDir))); // lve: z, 0.f, -x (wtf???)
+
+		//forwardDir = { 1.f, 0.f, 0.f };
+
+		glm::vec3 moveDir{ 0.f };
+		if (moveFwd > 0.f) { moveDir += forwardDir; }
+		else if (moveFwd < 0.f) { moveDir -= forwardDir; }
+
+		if (moveRight > 0.f) { moveDir += glm::vec3{ 0.f, -1.f, 0.f }; }
+		else if (moveRight < 0.f) { moveDir -= glm::vec3{ 0.f, -1.f, 0.f }; }
+
+		if (moveUp > 0.f) { moveDir += glm::vec3{ 0.f, 0.f, 1.f }; }
+		else if (moveUp < 0.f) { moveDir -= glm::vec3{ 0.f, 0.f, 1.f }; }
+
+		if (glm::dot(moveDir, moveDir) > std::numeric_limits<float>::epsilon()) 
+		{
+			transform.translation += moveSpeed * deltaTime * glm::normalize(moveDir);
+		}
+
+		return forwardDir; // test
+	}
+
+	static glm::mat4 getWorldBasisMatrix() 
+	{
+		/*	indentity matrix rearranged to swap axes,
+		*	resulting in a right-handed z-up/x-forward basis:
+		*	-y (up) becomes z, x (right) becomes -y, z (forward) becomes x */
+		glm::mat4 basis{ 0.f };
+		basis[1][0] = -1.f; // x moved to y (row 2)
+		basis[2][1] = 1.f; // y moved to z (row 3)
+		basis[0][2] = -1.f; // z moved to x (row 1)
+		basis[3][3] = 1.f; // always 1
+		return basis;
 	}
 
 };

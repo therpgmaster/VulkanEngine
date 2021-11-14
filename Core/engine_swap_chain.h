@@ -34,7 +34,7 @@ namespace EngineCore {
 		uint32_t width() { return swapChainExtent.width; }
 		uint32_t height() { return swapChainExtent.height; }
 
-		float extentAspectRatio() {
+		float getExtentAspectRatio() const {
 			return static_cast<float>(swapChainExtent.width) / static_cast<float>(swapChainExtent.height);
 		}
 		VkFormat findDepthFormat();

@@ -36,7 +36,8 @@ namespace EngineCore
 		
 		// TODO: this is a temporary single-camera setup, remember that we also delete this object below
 		CameraComponent* camera = new CameraComponent(45.f, 0.8f, 10.f);
-		camera->transform.rotation = { 0.f, Transform3D::degToRad(-90.f), Transform3D::degToRad(-90.f) };
+		//camera->transform.rotation = { 0.f, Transform3D::degToRad(-90.f), Transform3D::degToRad(-90.f) };
+		//camera->transform.translation.x -= 2.f;
 
 		// input setup
 		window.input.captureMouseCursor(true);
@@ -62,7 +63,7 @@ namespace EngineCore
 				renderSys.renderMeshes(commandBuffer, loadedMeshes, camera, deltaTime, elapsedTime, &window.input);
 				renderer.endSwapchainRenderPass(commandBuffer);
 				renderer.endFrame(); // submit command buffer
-				camera->aspectRatio = window.getAspectRatio();
+				camera->aspectRatio = renderer.getAspectRatio();
 			}
 			deltaTime = getTiming();
 
@@ -79,6 +80,7 @@ namespace EngineCore
 		}
 		delete camera;
 		vkDeviceWaitIdle(device.device()); // block until GPU finished
+		
 	}
 
 	// creates a 1x1x1 cube centered at offset
@@ -143,9 +145,25 @@ namespace EngineCore
 
 	void EngineApplication::loadActors() 
 	{
+		
 		StaticMesh::MeshBuilder builder{};
 		builder.loadFromFile("G:/VulkanDev/VulkanEngine/Core/Meshes/x_y_.obj"); // TODO: hardcoded paths
-		loadedMeshes.push_back(new StaticMesh(device, builder));
+
+		// create objects
+		for (int i = 0; i < 6; i++) 
+		{
+			glm::vec3 positions[]
+			{
+				{ 1.f, 0.f, 0.f },
+				{ -1.f, 0.f, 0.f },
+				{ 0.f, 1.f, 0.f },
+				{ 0.f, -1.f, 0.f },
+				{ 0.f, 0.f, 1.f },
+				{ 0.f, 0.f, -1.f },
+			};
+			loadedMeshes.push_back(new StaticMesh(device, builder));
+			loadedMeshes[i]->transform.translation = positions[i];
+		}
 
 		/*std::shared_ptr<EngineModel> cubemodel = createCubeModel(device, { 0.f, 0.f, 0.f }, 1.f);
 		auto cube = EngineObject::createObject();
