@@ -1,7 +1,7 @@
 #include "application.h"
 #include "mesh_rendersys.h"
 
-#include "UserIntegrals/CameraComponent.h"
+#include "ECS/CameraComponent.h"
 #include "materials.h"
 
 #include <stdexcept>
@@ -28,8 +28,8 @@ namespace EngineCore
 	{
 		MeshRenderSystem renderSys{ device, renderer.getSwapchainRenderPass() };
 		// TODO: hardcoded paths
-		ShaderFilePaths shaders("G:/VulkanDev/VulkanEngine/Core/Shaders/shader.vert.spv",
-								"G:/VulkanDev/VulkanEngine/Core/Shaders/shader.frag.spv");
+		ShaderFilePaths shaders("G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader.vert.spv",
+								"G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader.frag.spv");
 		MaterialCreateInfo matInfo(device, renderer.getSwapchainRenderPass(), shaders);
 		if (loadedMeshes.size() > 0 && loadedMeshes[0]) { for (auto* m : loadedMeshes) { m->setMaterial(matInfo); } }
 		else { throw std::runtime_error("could not access loaded mesh"); }
@@ -70,8 +70,8 @@ namespace EngineCore
 			// temporary test of materials system (TODO)
 			if ((false) && elapsedTime > 1.5 && elapsedTime < 1.8 && !materialSwitchTestDone)
 			{
-				ShaderFilePaths sp_2("G:/VulkanDev/VulkanEngine/Core/Shaders/shader.vert.spv",
-					"G:/VulkanDev/VulkanEngine/Core/Shaders/shader2test.frag.spv");
+				ShaderFilePaths sp_2("G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader.vert.spv",
+					"G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader2test.frag.spv");
 				MaterialCreateInfo matInfo_2(device, renderer.getSwapchainRenderPass(), sp_2);
 				if (loadedMeshes.size() > 0 && loadedMeshes[0]) { loadedMeshes[0]->setMaterial(matInfo_2); }
 				materialSwitchTestDone = true;
@@ -147,7 +147,7 @@ namespace EngineCore
 	{
 		
 		StaticMesh::MeshBuilder builder{};
-		builder.loadFromFile("G:/VulkanDev/VulkanEngine/Core/Meshes/x_y_.obj"); // TODO: hardcoded paths
+		builder.loadFromFile("G:/VulkanDev/VulkanEngine/Core/DevResources/Meshes/x_y_.obj"); // TODO: hardcoded paths
 
 		// create objects
 		for (int i = 0; i < 6; i++) 

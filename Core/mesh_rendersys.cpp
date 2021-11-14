@@ -1,6 +1,6 @@
 #include "mesh_rendersys.h"
 
-#include "UserIntegrals/CameraComponent.h"
+#include "ECS/CameraComponent.h"
 
 #include <stdexcept>
 #include <array>

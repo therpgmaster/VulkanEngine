@@ -1,5 +1,5 @@
-#include "engine_device.h"
-#include "application.h"
+#include "Core/GPU/engine_device.h"
+#include "Core/application.h"
 #include <cstring>
 #include <iostream>
 #include <set>
@@ -7,7 +7,7 @@
 
 // image importer, can only be defined in one (source) file
 #define STB_IMAGE_IMPLEMENTATION
-#include "../ThirdParty/stb_image.h"
+#include "Core/../ThirdParty/stb_image.h"
 
 namespace EngineCore 
 {
@@ -554,7 +554,7 @@ namespace EngineCore
 	void EngineDevice::importImageFromFile(const char* path)
 	{
 		// based on Vulkan Tutorial - Texture mapping
-		path = "Textures/texture.png"; // TODO: remove hardcoded path
+		path = "DevResources/Textures/texture.png"; // TODO: remove hardcoded path
 		int texWidth, texHeight, texChannels;
 		// import using stbi
 		stbi_uc* pixels = stbi_load(path, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);

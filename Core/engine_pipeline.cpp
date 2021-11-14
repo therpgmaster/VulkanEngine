@@ -1,5 +1,5 @@
 #include "engine_pipeline.h"
-#include "UserIntegrals/StaticMesh.h"
+#include "ECS/StaticMesh.h"
 
 // std
 #include <fstream>

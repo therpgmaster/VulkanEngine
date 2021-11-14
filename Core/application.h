@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine_window.h"
-#include "engine_device.h"
+#include "Core/engine_window.h"
+#include "Core/GPU/engine_device.h"
 #include "engine_renderer.h"
 
 // std
@@ -9,9 +9,9 @@
 #include <vector>
 #include <chrono> // timing
 
-#include "UserIntegrals/StaticMesh.h"
-#include "UserIntegrals/GenericActor.h"
-#include "CommonTypes.h"
+#include "ECS/StaticMesh.h"
+#include "ECS/GenericActor.h"
+#include "Types/CommonTypes.h"
 
 class SharedMaterialsPool;
 

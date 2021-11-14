@@ -1,8 +1,8 @@
 #pragma once
 
-#include "engine_window.h"
-#include "engine_device.h"
-#include "engine_swap_chain.h"
+#include "Core/engine_window.h"
+#include "Core/GPU/engine_device.h"
+#include "Core/engine_swap_chain.h"
 
 // std
 #include <memory>

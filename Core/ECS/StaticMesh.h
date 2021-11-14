@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../engine_device.h"
-#include "ActorComponent.h"
-#include "../materials.h"
+#include "Core/GPU/engine_device.h"
+#include "Core/ECS/ActorComponent.h"
+#include "Core/materials.h"
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine_device.h"
-#include "engine_pipeline.h"
+#include "Core/GPU/engine_device.h"
+#include "Core/engine_pipeline.h"
 
 // glm
 #include <glm/gtc/matrix_transform.hpp>
@@ -11,7 +11,7 @@
 #include <cmath> // only used in perspective calculation
 
 class CameraComponent;
-#include "UserIntegrals/StaticMesh.h"
+#include "ECS/StaticMesh.h"
 
 namespace EngineCore
 {

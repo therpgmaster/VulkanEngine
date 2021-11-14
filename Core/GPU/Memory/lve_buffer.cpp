@@ -32,7 +32,7 @@ namespace EngineCore
 
 	LveBuffer::LveBuffer(EngineDevice& device, VkDeviceSize instanceSize, uint32_t instanceCount, VkBufferUsageFlags usageFlags, 
 						VkMemoryPropertyFlags memoryPropertyFlags, VkDeviceSize minOffsetAlignment)
-		: lveDevice{ device }, 
+		: device{ device }, 
 		instanceSize{ instanceSize }, 
 		instanceCount{ instanceCount }, 
 		usageFlags{ usageFlags },
@@ -73,7 +73,7 @@ namespace EngineCore
 	void LveBuffer::unmap() 
 	{
 		if (mapped) {
-			vkUnmapMemory(lveDevice.device(), memory);
+			vkUnmapMemory(device.device(), memory);
 			mapped = nullptr;
 		}
 	}
