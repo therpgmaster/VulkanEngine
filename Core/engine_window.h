@@ -19,7 +19,7 @@ namespace EngineCore
 		EngineWindow& operator=(const EngineWindow&) = delete;
 
 		// true if the window should be destroyed
-		const bool& getCloseWindow() { return glfwWindowShouldClose(windowPtr); }
+		const bool getCloseWindow() { return glfwWindowShouldClose(windowPtr); }
 
 		VkExtent2D getExtent() { return { static_cast<uint32_t>(width), static_cast<uint32_t>(height) }; }
 		bool wasWindowResized() { return framebufferResized; }
