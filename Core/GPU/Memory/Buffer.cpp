@@ -8,7 +8,8 @@ namespace EngineCore
 {
 	VkDeviceSize GBuffer::getAlignment(VkDeviceSize instanceSize, VkDeviceSize minOffsetAlignment) 
 	{
-		if (minOffsetAlignment > 0) {
+		if (minOffsetAlignment > 0) 
+		{
 			return (instanceSize + minOffsetAlignment - 1) & ~(minOffsetAlignment - 1);
 		}
 		return instanceSize;
@@ -16,11 +17,8 @@ namespace EngineCore
 
 	GBuffer::GBuffer(EngineDevice& device, VkDeviceSize instanceSize, uint32_t instanceCount, VkBufferUsageFlags usageFlags, 
 						VkMemoryPropertyFlags memoryPropertyFlags, VkDeviceSize minOffsetAlignment)
-		: device{ device }, 
-		instanceSize{ instanceSize }, 
-		instanceCount{ instanceCount }, 
-		usageFlags{ usageFlags },
-		memoryPropertyFlags{ memoryPropertyFlags } 
+				: device{ device }, instanceSize{ instanceSize }, instanceCount{ instanceCount }, 
+				usageFlags{ usageFlags }, memoryPropertyFlags{ memoryPropertyFlags } 
 	{
 		alignmentSize = getAlignment(instanceSize, minOffsetAlignment);
 		bufferSize = alignmentSize * instanceCount;
@@ -54,9 +52,7 @@ namespace EngineCore
 		assert(mapped && "cannot copy to unmapped buffer");
 
 		if (size == VK_WHOLE_SIZE) 
-		{
-			memcpy(mapped, data, bufferSize);
-		}
+		{ memcpy(mapped, data, bufferSize); }
 		else 
 		{
 			char* memOffset = (char*)mapped;
@@ -71,7 +67,7 @@ namespace EngineCore
 		mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
 		mappedRange.memory = memory;
 		mappedRange.offset = offset;
-		mappedRange.size = size;
+		mappedRange.size = size; // bytes to flush, starting at offset
 		return vkFlushMappedMemoryRanges(device.device(), 1, &mappedRange);
 	}
 

@@ -4,7 +4,6 @@
 
 namespace EngineCore 
 {
-
 	class GBuffer 
 	{
 	public:
@@ -15,15 +14,20 @@ namespace EngineCore
 		GBuffer(const GBuffer&) = delete;
 		GBuffer& operator=(const GBuffer&) = delete;
 
+		// calls vkMapMemory for this buffer, whole range by default, starting at 0 (bytes)
 		VkResult map(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
 		void unmap();
 
 		void writeToBuffer(void* data, VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
+		// flushes buffer memory to make it visible to the device (GPU), only required for non-coherent memory
 		VkResult flush(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
 		VkDescriptorBufferInfo descriptorInfo(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
+		// invalidate buffer memory to make it visible to the device (GPU), only required for non-coherent memory
 		VkResult invalidate(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
 
+		// copies "instanceSize" bytes to the mapped buffer at offset of index*alignmentSize
 		void writeToIndex(void* data, int index);
+		// flush the memory range at index*alignmentSize in the buffer to make it visible to the device
 		VkResult flushIndex(int index);
 		VkDescriptorBufferInfo descriptorInfoForIndex(int index);
 		VkResult invalidateIndex(int index);
@@ -38,6 +42,7 @@ namespace EngineCore
 		VkDeviceSize getBufferSize() const { return bufferSize; }
 
 	private:
+		// minimum instance size required to be compatible with device minOffsetAlignment
 		static VkDeviceSize getAlignment(VkDeviceSize instanceSize, VkDeviceSize minOffsetAlignment);
 
 		EngineDevice& device;
