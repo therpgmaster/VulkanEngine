@@ -2,8 +2,11 @@
 
 #include "Core/GPU/engine_device.h"
 
-// vulkan
-#include <vulkan/vulkan.h>
+// warning-ignore hack only works in header
+#pragma warning(push, 0) 
+#include <vulkan/vulkan.h> // include vulkan header
+#pragma warning(pop)
+
 
 // std
 #include <string>

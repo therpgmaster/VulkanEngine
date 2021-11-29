@@ -15,13 +15,6 @@
 
 namespace EngineCore
 {
-	struct SimplePushConstantData
-	{
-		glm::mat4 transform{ 1.f };
-		glm::vec2 offset;
-		alignas(16) glm::vec3 color; // data to gpu must be aligned to multiples of 16
-	};
-
 	MeshRenderSystem::MeshRenderSystem(EngineDevice& deviceIn, VkRenderPass renderPass) : device{deviceIn}
 	{
 		//createPipelineLayout();
@@ -34,21 +27,24 @@ namespace EngineCore
 	}
 
 	void MeshRenderSystem::renderMeshes(VkCommandBuffer commandBuffer, std::vector<StaticMesh*>& meshes,
-		CameraComponent* camera, const float& deltaTimeSeconds, float time, InputSystem* inputSysPtr)
+			CameraComponent* camera, const float& deltaTimeSeconds, float time, InputSystem* inputSysPtr, 
+			VkDescriptorSet sceneGlobalDescriptorSet)
 	{
-		for (auto* mesh : meshes)
+		for (auto* pMesh : meshes)
 		{
-			if (mesh == nullptr || mesh->getMaterial() == nullptr) continue;
-			
-			mesh->getMaterial()->bindToCommandBuffer(commandBuffer); // bind material-specific shading pipeline
+			if (!pMesh || !pMesh->getMaterial()) { continue; }
+			auto& mesh = *pMesh;
+			auto& material = *mesh.getMaterial();
 
-			SimplePushConstantData push{};
+			material.bindToCommandBuffer(commandBuffer); // bind material-specific shading pipeline
+			// bind scene global descriptor set for every primitive
+			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, material.getPipelineLayout(),
+									0, 1, &sceneGlobalDescriptorSet, 0, nullptr);
 
-			push.color = mesh->color;
-			// spin 3D primitive
+			// spin 3D primitive - TODO: remove
 			float spinRate = 0.0f;
-			mesh->transform.rotation.y = glm::mod(mesh->transform.rotation.y + (spinRate * deltaTimeSeconds), glm::two_pi<float>());
-			mesh->transform.rotation.x = glm::mod(mesh->transform.rotation.x + ((spinRate / 2.f) * deltaTimeSeconds), glm::two_pi<float>());
+			mesh.transform.rotation.y = glm::mod(mesh.transform.rotation.y + (spinRate * deltaTimeSeconds), glm::two_pi<float>());
+			mesh.transform.rotation.x = glm::mod(mesh.transform.rotation.x + ((spinRate / 2.f) * deltaTimeSeconds), glm::two_pi<float>());
 
 			/*if (camera != nullptr)
 			{
@@ -78,24 +74,26 @@ namespace EngineCore
 			auto mf = inputSysPtr->getAxisValue(0);
 			auto mr = inputSysPtr->getAxisValue(1);
 			auto mu = inputSysPtr->getAxisValue(2);
-			auto fwdVec = camera->moveInPlaneXZ(lookInput, mf, mr, mu, deltaTimeSeconds);
+			camera->moveInPlaneXZ(lookInput, mf, mr, mu, deltaTimeSeconds);
 
-			//std::cout << "x: " << lookInput.x << " y: " << lookInput.y << "\n \n";
-
-			// view matrix and mesh transform matrix
+			/* view matrix and mesh transform matrix
 			glm::mat4 projectionMatrix = camera->getProjectionMatrixBlender();
 			glm::mat4 viewMatrix = camera->getViewMatrix(true);
-			glm::mat4 meshMatrix =  mesh->transform.mat4();
+			glm::mat4 meshMatrix =  mesh.transform.mat4();
 			glm::mat4 worldMatrix = CameraComponent::getWorldBasisMatrix();
-			push.transform = projectionMatrix * worldMatrix * viewMatrix * meshMatrix  ;
-
+			// old way of sending matrices to gpu
+			push.transform = projectionMatrix * worldMatrix * viewMatrix * meshMatrix;
 			vkCmdPushConstants(commandBuffer, mesh->getMaterial()->getPipelineLayout(),
 				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-				0, sizeof(SimplePushConstantData), &push);
+				0, sizeof(SimplePushConstantData), &push);*/
+
+			Material::MeshPushConstants push{};
+			push.transform = mesh.transform.mat4();
+			material.writePushConstantsForMesh(commandBuffer, push);
 
 			// record mesh draw command
-			mesh->bind(commandBuffer);
-			mesh->draw(commandBuffer);
+			mesh.bind(commandBuffer);
+			mesh.draw(commandBuffer);
 		}
 	}
 

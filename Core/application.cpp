@@ -2,11 +2,13 @@
 #include "mesh_rendersys.h"
 
 #include "ECS/CameraComponent.h"
-#include "materials.h"
+#include "Core/GPU/Material.h"
+#include "Core/GPU/Memory/Buffer.h"
 
 #include <stdexcept>
 #include <array>
 #include <iostream>
+
 // glm
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -17,137 +19,72 @@ namespace EngineCore
 {
 	EngineApplication::EngineApplication() 
 	{
-		loadActors();
+		loadActors(); 
 	}
 
-	EngineApplication::~EngineApplication()
-	{
-	}
+	EngineApplication::~EngineApplication() {};
+
+	
 
 	void EngineApplication::startExecution()
 	{
 		MeshRenderSystem renderSys{ device, renderer.getSwapchainRenderPass() };
-		// TODO: hardcoded paths
-		ShaderFilePaths shaders("G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader.vert.spv",
-								"G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader.frag.spv");
-		MaterialCreateInfo matInfo(device, renderer.getSwapchainRenderPass(), shaders);
-		if (loadedMeshes.size() > 0 && loadedMeshes[0]) { for (auto* m : loadedMeshes) { m->setMaterial(matInfo); } }
-		else { throw std::runtime_error("could not access loaded mesh"); }
 		
 		// TODO: this is a temporary single-camera setup, remember that we also delete this object below
 		CameraComponent* camera = new CameraComponent(45.f, 0.8f, 10.f);
-		//camera->transform.rotation = { 0.f, Transform3D::degToRad(-90.f), Transform3D::degToRad(-90.f) };
-		//camera->transform.translation.x -= 2.f;
-
+		
 		// input setup
 		window.input.captureMouseCursor(true);
 		setupDefaultInputs();
 
-		double deltaTime = 0.0;
-		double elapsedTime = 0.0;
-				bool materialSwitchTestDone = false; // only do the temporary test (below) once
+		// TODO: hardcoded paths - create test material
+		ShaderFilePaths shaders("G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader.vert.spv",
+			"G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader.frag.spv");
+		std::vector<VkDescriptorSetLayout> setLayouts =
+		{ globalDSetMgr.sceneGlobalSetLayout.get()->getDescriptorSetLayout() };
+		MaterialCreateInfo matInfo(device, renderer.getSwapchainRenderPass(), shaders, setLayouts);
+		if (loadedMeshes.size() > 0 && loadedMeshes[0]) { for (auto* m : loadedMeshes) { m->setMaterial(matInfo); } }
+		else { throw std::runtime_error("could not access loaded mesh"); }
 
-		// window event loop (every frame)
+		// window event loop
 		while (!window.getCloseWindow()) 
 		{
-			measureTiming();
-			elapsedTime = elapsedTime + deltaTime;
+			epTimer.deltaStart();
 			//std::cout << " FPS " << getFps(deltaTime) << " time(s) " << elapsedTime << "\n";
 			window.input.resetInputValues(); // set all input values to zero
 			window.input.updateBoundInputs(); // get input states
 			window.pollEvents();
+			// render frame
 			if (auto commandBuffer = renderer.beginFrame()) 
 			{
+				int frameIndex = renderer.getFrameIndex();
+
+				// update scene global descriptors
+				SceneGlobalDataBuffer bufferData{};
+				bufferData.projectionViewMatrix = camera->getProjectionMatrixBlender()
+					* CameraComponent::getWorldBasisMatrix() * camera->getViewMatrix(true);
+				globalDSetMgr.writeToSceneGlobalBuffer(frameIndex, bufferData, true);
+
 				renderer.beginSwapchainRenderPass(commandBuffer);
 				// render meshes
-				renderSys.renderMeshes(commandBuffer, loadedMeshes, camera, deltaTime, elapsedTime, &window.input);
+				renderSys.renderMeshes(commandBuffer, loadedMeshes, camera, epTimer.delta(), epTimer.elapsed(),
+									 &window.input, globalDSetMgr.sceneGlobalSets[frameIndex]);
 				renderer.endSwapchainRenderPass(commandBuffer);
 				renderer.endFrame(); // submit command buffer
 				camera->aspectRatio = renderer.getAspectRatio();
 			}
-			deltaTime = getTiming();
-
-			// temporary test of materials system (TODO)
-			if ((false) && elapsedTime > 1.5 && elapsedTime < 1.8 && !materialSwitchTestDone)
-			{
-				ShaderFilePaths sp_2("G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader.vert.spv",
-					"G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader2test.frag.spv");
-				MaterialCreateInfo matInfo_2(device, renderer.getSwapchainRenderPass(), sp_2);
-				if (loadedMeshes.size() > 0 && loadedMeshes[0]) { loadedMeshes[0]->setMaterial(matInfo_2); }
-				materialSwitchTestDone = true;
-			}
-
+			epTimer.deltaEnd();
 		}
 		delete camera;
 		vkDeviceWaitIdle(device.device()); // block until GPU finished
-		
+		std::cout << "FPS: " << epTimer.fps() << " Elapsed: " << (float)epTimer.elapsed();
 	}
-
-	// creates a 1x1x1 cube centered at offset
-	/*std::unique_ptr<EngineModel> createCubeModel(EngineDevice& device, glm::vec3 offset, float size) {
-		float s = size / 2; // default half size is point five
-		std::vector<EngineModel::Vertex> vertices
-		{
-			// left face (white)
-			{{-s, -s, -s}, {.9f, .9f, .9f}},
-			{{-s, s, s}, {.9f, .9f, .9f}},
-			{{-s, -s, s}, {.9f, .9f, .9f}},
-			{{-s, -s, -s}, {.9f, .9f, .9f}},
-			{{-s, s, -s}, {.9f, .9f, .9f}},
-			{{-s, s, s}, {.9f, .9f, .9f}},
-		
-			// right face (yellow)
-			{{s, -s, -s}, {.8f, .8f, .1f}},
-			{{s, s, s}, {.8f, .8f, .1f}},
-			{{s, -s, s}, {.8f, .8f, .1f}},
-			{{s, -s, -s}, {.8f, .8f, .1f}},
-			{{s, s, -s}, {.8f, .8f, .1f}},
-			{{s, s, s}, {.8f, .8f, .1f}},
-
-			// top face (orange, remember y axis points down)
-			{{-s, -s, -s}, {.9f, .6f, .1f}},
-			{{s, -s, s}, {.9f, .6f, .1f}},
-			{{-s, -s, s}, {.9f, .6f, .1f}},
-			{{-s, -s, -s}, {.9f, .6f, .1f}},
-			{{s, -s, -s}, {.9f, .6f, .1f}},
-			{{s, -s, s}, {.9f, .6f, .1f}},
-
-			// bottom face (red)
-			{{-s, s, -s}, {.8f, .1f, .1f}},
-			{{s, s, s}, {.8f, .1f, .1f}},
-			{{-s, s, s}, {.8f, .1f, .1f}},
-			{{-s, s, -s}, {.8f, .1f, .1f}},
-			{{s, s, -s}, {.8f, .1f, .1f}},
-			{{s, s, s}, {.8f, .1f, .1f}},
-
-			// nose face (blue)
-			{{-s, -s, s}, {.1f, .1f, .8f}},
-			{{s, s, s}, {.1f, .1f, .8f}},
-			{{-s, s, s}, {.1f, .1f, .8f}},
-			{{-s, -s, s}, {.1f, .1f, .8f}},
-			{{s, -s, s}, {.1f, .1f, .8f}},
-			{{s, s, s}, {.1f, .1f, .8f}},
-
-			// tail face (green)
-			{{-s, -s, -s}, {.1f, .8f, .1f}},
-			{{s, s, -s}, {.1f, .8f, .1f}},
-			{{-s, s, -s}, {.1f, .8f, .1f}},
-			{{-s, -s, -s}, {.1f, .8f, .1f}},
-			{{s, -s, -s}, {.1f, .8f, .1f}},
-			{{s, s, -s}, {.1f, .8f, .1f}},
-		};
-		for (auto& v : vertices) 
-		{
-			v.position += offset;
-		}
-		return std::make_unique<EngineModel>(device, vertices);
-	}*/
 
 	void EngineApplication::loadActors() 
 	{
 		
 		StaticMesh::MeshBuilder builder{};
-		builder.loadFromFile("G:/VulkanDev/VulkanEngine/Core/DevResources/Meshes/x_y_.obj"); // TODO: hardcoded paths
+		builder.loadFromFile("G:/VulkanDev/VulkanEngine/Core/DevResources/Meshes/torus.obj"); // TODO: hardcoded paths
 
 		// create objects
 		for (int i = 0; i < 6; i++) 
@@ -164,22 +101,6 @@ namespace EngineCore
 			loadedMeshes.push_back(new StaticMesh(device, builder));
 			loadedMeshes[i]->transform.translation = positions[i];
 		}
-
-		/*std::shared_ptr<EngineModel> cubemodel = createCubeModel(device, { 0.f, 0.f, 0.f }, 1.f);
-		auto cube = EngineObject::createObject();
-		cube.model = cubemodel;
-		cube.transform.translation = { 0.f, 0.f, 0.f };
-		cube.transform.scale = { 0.35f, 0.35f, 0.35f };
-		engineObjects.push_back(std::move(cube));
-
-		// 2nd cube (test)
-		std::shared_ptr<EngineModel> cubemodel2 = createCubeModel(device, { 0.f, 0.f, 0.f }, 1.f);
-		auto cube2 = EngineObject::createObject();
-		cube2.model = cubemodel2;
-		cube2.transform.translation = { -0.15f, 0.15f, -0.5f };
-		cube2.transform.scale = { 0.2f, 0.2f, 0.2f };
-		cube2.transform.rotation = { 45.f, 0.f, 0.f };
-		engineObjects.push_back(std::move(cube2));*/
 	}
 
 	void EngineApplication::setupDefaultInputs()

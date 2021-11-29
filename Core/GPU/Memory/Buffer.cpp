@@ -34,6 +34,7 @@ namespace EngineCore
 
 	VkResult GBuffer::map(VkDeviceSize size, VkDeviceSize offset) 
 	{
+		// this maps the memory range to the host, making it CPU-accessible
 		assert(buffer && memory && "cannot map uninitialized buffer");
 		return vkMapMemory(device.device(), memory, offset, size, 0, &mapped);
 	}

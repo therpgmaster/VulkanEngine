@@ -1,6 +1,8 @@
 #pragma once
 
-#include "GenericDataObject.h"
+#include "Core/ECS/GenericDataObject.h"
+#include "Core/Types/CommonTypes.h"
+#include "Core/WorldSector.h"
 
 // std
 #include <vector>
@@ -10,9 +12,11 @@ class StaticMesh;
 
 // common base class for actor objects which can (but do not necessarily) exist in a world
 // instances could have a spatial presence and occupy 3D space
-class GenericActor : public GenericDataObject
+class Actor : public GenericDataObject, public World::PhysicalElementInterface
 {
 public:
+	ActorTransform transform;
+
 	/* keeps track of all the components registered to this actor */
 	std::vector<ActorComponent*> components;
 
@@ -40,5 +44,12 @@ private:
 	bool hasPhysicalPresence;
 	/* if false, user defined tick functions will be skipped for this actor and its components */
 	bool hasTickEnabled;
+
+	struct ActorTransform 
+	{
+		float x;
+		float y;
+		float z;
+	};
 
 };

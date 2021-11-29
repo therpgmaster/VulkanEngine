@@ -1,5 +1,5 @@
 #include "ActorComponent.h"
-#include "GenericActor.h"
+#include "Actor.h"
 
 
 ActorComponent::~ActorComponent() 

@@ -32,11 +32,12 @@ namespace EngineCore
 		VkDescriptorBufferInfo descriptorInfoForIndex(int index);
 		VkResult invalidateIndex(int index);
 
+		// returns the underlying VkBuffer handle
 		VkBuffer getBuffer() const { return buffer; }
 		void* getMappedMemory() const { return mapped; }
 		uint32_t getInstanceCount() const { return instanceCount; }
 		VkDeviceSize getInstanceSize() const { return instanceSize; }
-		VkDeviceSize getAlignmentSize() const { return instanceSize; }
+		VkDeviceSize getAlignmentSize() const { return alignmentSize; }
 		VkBufferUsageFlags getUsageFlags() const { return usageFlags; }
 		VkMemoryPropertyFlags getMemoryPropertyFlags() const { return memoryPropertyFlags; }
 		VkDeviceSize getBufferSize() const { return bufferSize; }

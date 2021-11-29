@@ -1,8 +1,8 @@
-#include "GenericActor.h"
+#include "Actor.h"
 #include "ActorComponent.h"
 #include "StaticMesh.h"
 
-void GenericActor::registerComponent(ActorComponent& component, const bool& enableComponentTick, const bool& hasMesh)
+void Actor::registerComponent(ActorComponent& component, const bool& enableComponentTick, const bool& hasMesh)
 {
 	component.setParentActor(*this);
 	components.push_back(&component); // add to vector of registered components
@@ -11,7 +11,7 @@ void GenericActor::registerComponent(ActorComponent& component, const bool& enab
 	{ hasPhysicalPresence = true; }
 }
 
-void GenericActor::unregisterComponent(ActorComponent& component) 
+void Actor::unregisterComponent(ActorComponent& component) 
 {
 	// move the destroyed component to end of vector and remove it
 	std::vector<ActorComponent*>::iterator newEnd = std::remove(components.begin(), components.end(), &component);
@@ -19,14 +19,14 @@ void GenericActor::unregisterComponent(ActorComponent& component)
 	components.shrink_to_fit(); // free unused memory
 }
 
-void GenericActor::removeComponent(ActorComponent* component)
+void Actor::removeComponent(ActorComponent* component)
 {
 	if (component == nullptr) { return; }
 	unregisterComponent(*component);
 	delete component;
 }
 
-std::vector<StaticMesh*> GenericActor::getAllMeshComponents()
+std::vector<StaticMesh*> Actor::getAllMeshComponents()
 {
 	if (meshComponents.empty()) { return std::vector<StaticMesh*>{ nullptr }; }
 	return meshComponents;

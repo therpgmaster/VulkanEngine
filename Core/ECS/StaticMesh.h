@@ -1,12 +1,18 @@
 #pragma once
 
 #include "Core/GPU/engine_device.h"
+#include "Core/GPU/Memory/Buffer.h"
 #include "Core/ECS/ActorComponent.h"
-#include "Core/materials.h"
+#include "Core/GPU/Material.h"
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
+
+// included here because warning-ignore hack only works in header files
+#pragma warning(push, 0)
+#include "../../ThirdParty/tiny_obj_loader.h"
+#pragma warning(pop)
 
 // std
 #include <vector>
@@ -25,13 +31,10 @@ namespace EngineCore
 			glm::vec3 color{};
 			glm::vec3 normal{};
 			glm::vec2 uv{};
-
 			// binding/attribute descriptions are read by the pipeline
 			static std::vector<VkVertexInputBindingDescription> getBindingDescriptions();
 			static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();
 		};
-
-		glm::vec3 color; // TODO: remove from here and stop using in shaders
 
 		struct MeshBuilder 
 		{
@@ -50,7 +53,7 @@ namespace EngineCore
 		StaticMesh(const StaticMesh&) = delete;
 		StaticMesh& operator=(const StaticMesh&) = delete;
 
-		// binds the primitive's vertices to prepare for drawing
+		// binds the primitive's vertices to a command buffer (preparation to render)
 		void bind(VkCommandBuffer commandBuffer);
 		// records a draw call to the command buffer (final step to render mesh)
 		void draw(VkCommandBuffer commandBuffer);
@@ -70,13 +73,13 @@ namespace EngineCore
 
 		EngineDevice& engineDevice;
 
-		VkBuffer vertexBuffer;
-		VkDeviceMemory vertexBufferMemory;
+		std::unique_ptr<GBuffer> vertexBuffer;
 		uint32_t vertexCount;
+
 		bool hasIndexBuffer = false;
-		VkBuffer indexBuffer;
-		VkDeviceMemory indexBufferMemory;
+		std::unique_ptr<GBuffer> indexBuffer;
 		uint32_t indexCount;
+		
 
 		// owned material object
 		std::unique_ptr<Material> material;

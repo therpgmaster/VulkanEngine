@@ -1,6 +1,9 @@
 #pragma once
 
-#define GLFW_INCLUDE_VULKAN
+// warning-ignore hack only works in header
+#pragma warning(push, 0)
+#include <vulkan/vulkan.h> // include vulkan header (before GLFW)
+#pragma warning(pop)
 #include <GLFW/glfw3.h> // GL Framework (GLFW) used to create an engine window
 #include <string>
 #include "Input.h"

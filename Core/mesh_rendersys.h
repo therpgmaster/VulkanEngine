@@ -15,7 +15,6 @@ class CameraComponent;
 
 namespace EngineCore
 {
-	/* a render system manages a pipeline and the associated shaders */
 	class MeshRenderSystem
 	{
 	public:
@@ -28,7 +27,7 @@ namespace EngineCore
 
 		void renderMeshes(VkCommandBuffer commandBuffer, std::vector<StaticMesh*>& meshes,
 							CameraComponent* camera, const float& deltaTimeSeconds, float time,
-							InputSystem* inputSysPtr);
+							InputSystem* inputSysPtr, VkDescriptorSet sceneGlobalDescriptorSet);
 
 	private:
 		//void createPipelineLayout();

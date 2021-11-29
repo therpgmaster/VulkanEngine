@@ -10,20 +10,61 @@
 #include <chrono> // timing
 
 #include "ECS/StaticMesh.h"
-#include "ECS/GenericActor.h"
+#include "ECS/Actor.h"
 #include "Types/CommonTypes.h"
+#include "Core/GPU/Memory/descriptors.h"
 
 class SharedMaterialsPool;
 
 namespace EngineCore
 {
+	class EngineProgramTimer
+	{
+		static const uint32_t deltasHistoryNum = 100;
+		using clock = std::chrono::steady_clock;
+		using timePoint = clock::time_point;
+	public:
+		EngineProgramTimer() : startTime{ clock::now() }{};
+		void deltaStart() { deltaStartTime = clock::now(); }
+		void deltaEnd()
+		{
+			std::chrono::duration<double, std::milli> ms = clock::now() - deltaStartTime;
+			recordDelta(ms.count() / 1000.0);
+		}
+		double delta() const { return deltas[lastDeltaIndex]; }
+		uint32_t fps() const { return (uint32_t) 1.0 / avgDelta(); }
+		double elapsed() const
+		{
+			std::chrono::duration<double, std::milli> ms = clock::now() - startTime;
+			return ms.count() / 1000.0;
+		}
+	private:
+		timePoint startTime;
+		timePoint deltaStartTime;
+		uint32_t lastDeltaIndex = 0;
+		double deltas[deltasHistoryNum] = { 0.0 };
+		void recordDelta(const double& ds) 
+		{
+			uint32_t i = lastDeltaIndex + 1;
+			if (i == deltasHistoryNum) { i = 0; }
+			deltas[i] = ds;
+			lastDeltaIndex = i;
+		}
+		double avgDelta() const
+		{
+			double v = 0.0;
+			for (double d : deltas) { v += d; }
+			return v / deltasHistoryNum;
+		}
+	};
+
 	// base class for an object representing the entire engine
 	class EngineApplication
 	{
 	public:
 		// hardcoded window size in pixels
-		static constexpr int WIDTH = 800;
-		static constexpr int HEIGHT = 600;
+		static constexpr int WIDTH = 1100;
+		static constexpr int HEIGHT = 720;
 
 		EngineApplication();
 		~EngineApplication();
@@ -46,23 +87,12 @@ namespace EngineCore
 		// the renderer manages the swapchain and the vulkan command buffers
 		EngineRenderer renderer{ window, device };
 
-		std::vector<StaticMesh*> loadedMeshes;
+		EngineProgramTimer epTimer{};
 
-		// timing
-		std::chrono::steady_clock::time_point timingStartPoint;
-		void measureTiming()
-		{
-			timingStartPoint = std::chrono::steady_clock::now();
-		};
-		double getTiming()
-		{ /* don't mess with this function, it'll break */
-			std::chrono::duration<double, std::milli> ms = std::chrono::steady_clock::now() - timingStartPoint;
-			return ms.count() / 1000.0;
-		};
-		uint32_t getFps(double deltaTimeSeconds)
-		{
-			return 1.0 / deltaTimeSeconds;
-		};
+		GlobalDescriptorSetManager globalDSetMgr{ device, EngineSwapChain::MAX_FRAMES_IN_FLIGHT };
+
+		std::unique_ptr<DescriptorPool> globalDescriptorPool{};
+		std::vector<StaticMesh*> loadedMeshes;
 
 	};
 

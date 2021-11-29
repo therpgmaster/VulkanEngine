@@ -30,7 +30,7 @@ public:
 	float vFOV = 45.f;
 	float aspectRatio = 1.333f;
 
-	void setFOVh(const float& deg) { vFOV = (float)Transform3D::degToRad((float)deg); }
+	void setFOVh(const float& deg) { vFOV = (float)Transform::degToRad((float)deg); }
 
 	glm::mat4 getProjectionMatrix() 
 	{
@@ -198,10 +198,10 @@ public:
 		return pmatrix;
 	}
 
-	glm::vec3 moveInPlaneXZ(const Vector2D<double>& lookInput, const float& moveFwd, const float& moveRight, const float& moveUp, const float& deltaTime)
+	void moveInPlaneXZ(const Vector2D<double>& lookInput, const float& moveFwd, const float& moveRight, const float& moveUp, const float& deltaTime)
 	{
 		float lookSpeed = 3.8f;
-		float moveSpeed = 0.003f;
+		float moveSpeed = 0.3f;
 
 		float yawInput = lookInput.x != 0 ? lookInput.x / abs(lookInput.x) : 0.f; 
 		float pitchInput = lookInput.y != 0 ? lookInput.y / abs(lookInput.y) : 0.f;
@@ -209,7 +209,7 @@ public:
 
 		// limit pitch values to exactly 85 degrees
 		transform.rotation.y = glm::clamp(transform.rotation.y, 
-				(float)Transform3D::degToRad(-85.f), (float)Transform3D::degToRad(85.f));
+				(float)Transform::degToRad(-85.f), (float)Transform::degToRad(85.f));
 		// prevent overflow from continous yawing
 		transform.rotation.z = glm::mod(transform.rotation.z, glm::two_pi<float>());
 
@@ -237,8 +237,6 @@ public:
 		{
 			transform.translation += moveSpeed * deltaTime * glm::normalize(moveDir);
 		}
-
-		return forwardDir; // test
 	}
 
 	static glm::mat4 getWorldBasisMatrix() 

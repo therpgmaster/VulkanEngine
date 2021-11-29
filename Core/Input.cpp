@@ -22,7 +22,7 @@ namespace EngineCore
 
 	InputSystem::InputSystem(EngineWindow* window) : parentWindow{ window }
 	{
-		assert((parentWindow && parentWindow->getGLFWwindow()) && "input system initialized with no window reference");
+		assert(parentWindow && "input system: initialized with no window reference");
 	}
 
 	/*void InputSystem::keyPressedCallback(const int& key, const int& scancode, const int& action, const int& mods)
@@ -93,7 +93,7 @@ namespace EngineCore
 	void InputSystem::captureMouseCursor(const bool& capture)
 	{
 		GLFWwindow* gw = parentWindow->getGLFWwindow();
-		assert(gw != NULL && "input: could not access glfw window");
+		assert(gw && "input system: could not access glfw window");
 		if (capture) 
 		{
 			// capture (disable) cursor
@@ -119,7 +119,7 @@ namespace EngineCore
 		{
 			int32_t key = binding.getKey();
 			if (key <= -1 || binding.axisIndex <= -1) { continue; }
-
+			assert(parentWindow->getGLFWwindow() && "input system: could not access glfw window");
 			float v = glfwGetKey(parentWindow->getGLFWwindow(), key) == GLFW_PRESS 
 						? binding.axisValueInfluence : 0.f;
 			axisValues[binding.axisIndex].influences.push_back(v);
