@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Core/GPU/engine_device.h"
-#include "Core/engine_pipeline.h"
+#include "Core/GPU/Pipeline.h"
 
 // glm
 #include <glm/gtc/matrix_transform.hpp>
@@ -19,8 +19,7 @@ namespace EngineCore
 	{
 	public:
 
-		MeshRenderSystem(EngineDevice& deviceIn, VkRenderPass renderPass);
-		~MeshRenderSystem();
+		MeshRenderSystem(EngineDevice& deviceIn, VkRenderPass renderPass) : device{ deviceIn } {};
 
 		MeshRenderSystem(const MeshRenderSystem&) = delete;
 		MeshRenderSystem& operator=(const MeshRenderSystem&) = delete;
@@ -30,11 +29,7 @@ namespace EngineCore
 							InputSystem* inputSysPtr, VkDescriptorSet sceneGlobalDescriptorSet);
 
 	private:
-		//void createPipelineLayout();
-		//void createPipeline(VkRenderPass renderPass, const char* vertexShaderPath, const char* fragmentShaderPath);
-
 		EngineDevice& device;
-		//VkPipelineLayout pipelineLayout;
 
 		static glm::mat4 orthographicMatrix(const float& n, const float& f)
 		{

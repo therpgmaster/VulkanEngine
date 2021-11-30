@@ -50,28 +50,6 @@ namespace EngineCore
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 		engineDevice.copyBuffer(stagingBuffer.getBuffer(), vertexBuffer->getBuffer(), bufferSize);
-
-		/*
-		// create staging buffer
-		VkBuffer stagingBuffer;
-		VkDeviceMemory stagingBufferMemory;
-		engineDevice.createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-					VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-					stagingBuffer, stagingBufferMemory);
-		// transfer vertex data to staging buffer
-		void* data;
-		vkMapMemory(engineDevice.device(), stagingBufferMemory, 0, bufferSize, 0, &data);
-		memcpy(data, vertices.data(), static_cast<size_t>(bufferSize));
-		vkUnmapMemory(engineDevice.device(), stagingBufferMemory);
-		// create destination buffer (GPU local for performance, not CPU accessible)
-		engineDevice.createBuffer(bufferSize, 
-					VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-					VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
-		// copy staging buffer to destination buffer
-		engineDevice.copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
-		// discard staging buffer
-		vkDestroyBuffer(engineDevice.device(), stagingBuffer, nullptr);
-		vkFreeMemory(engineDevice.device(), stagingBufferMemory, nullptr);*/
 	}
 
 	void StaticMesh::createIndexBuffers(const std::vector<uint32_t>& indices)

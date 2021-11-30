@@ -42,7 +42,7 @@ namespace EngineCore
 			"G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader.frag.spv");
 		std::vector<VkDescriptorSetLayout> setLayouts =
 		{ globalDSetMgr.sceneGlobalSetLayout.get()->getDescriptorSetLayout() };
-		MaterialCreateInfo matInfo(device, renderer.getSwapchainRenderPass(), shaders, setLayouts);
+		MaterialCreateInfo matInfo(renderer.getSwapchainRenderPass(), shaders, setLayouts);
 		if (loadedMeshes.size() > 0 && loadedMeshes[0]) { for (auto* m : loadedMeshes) { m->setMaterial(matInfo); } }
 		else { throw std::runtime_error("could not access loaded mesh"); }
 

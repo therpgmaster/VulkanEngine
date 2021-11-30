@@ -62,7 +62,7 @@ namespace EngineCore
 		void setMaterial(const MaterialCreateInfo& mci)
 		{
 			material.reset();
-			material = std::make_unique<Material>(mci);
+			material = std::make_unique<Material>(mci, engineDevice);
 		}
 
 		Material* getMaterial() { return material.get(); }
@@ -79,7 +79,6 @@ namespace EngineCore
 		bool hasIndexBuffer = false;
 		std::unique_ptr<GBuffer> indexBuffer;
 		uint32_t indexCount;
-		
 
 		// owned material object
 		std::unique_ptr<Material> material;

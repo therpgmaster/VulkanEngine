@@ -1,71 +1,71 @@
 #pragma once
 
-#include "engine_pipeline.h"
 #include "Core/GPU/engine_device.h"
 #include "Core/GPU/Memory/Descriptors.h"
+
 #include <glm/glm.hpp>
+
 #include <string>
+#include <vector>
 #include <memory>
 
 namespace EngineCore 
 {
+	struct PipelineConfig
+	{
+		PipelineConfig() = default;
+		PipelineConfig(const PipelineConfig&) = delete;
+		PipelineConfig& operator=(const PipelineConfig&) = delete;
+
+		VkPipelineViewportStateCreateInfo viewportInfo;
+		VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo;
+		VkPipelineRasterizationStateCreateInfo rasterizationInfo;
+		VkPipelineMultisampleStateCreateInfo multisampleInfo;
+		VkPipelineColorBlendAttachmentState colorBlendAttachment;
+		VkPipelineColorBlendStateCreateInfo colorBlendInfo;
+		VkPipelineDepthStencilStateCreateInfo depthStencilInfo;
+		std::vector<VkDynamicState> dynamicStateEnables;
+		VkPipelineDynamicStateCreateInfo dynamicStateInfo;
+		VkPipelineLayout pipelineLayout = nullptr;
+		VkRenderPass renderPass = nullptr;
+		uint32_t subpass = 0;
+	};
+
 	struct ShaderFilePaths
 	{
-		std::string vertexShaderPath;
-		std::string fragmentShaderPath;
-		ShaderFilePaths() {};
-		ShaderFilePaths(const char* vert, const char* frag) 
-			: vertexShaderPath{ vert }, fragmentShaderPath{ frag } {};
-		bool valid()
-		{ 
-			return (vertexShaderPath.size() < 250 && vertexShaderPath.size() > 3) &&
-				(fragmentShaderPath.size() < 250 && fragmentShaderPath.size() > 3); 
-		}
+		std::string vertPath;
+		std::string fragPath;
+		ShaderFilePaths() = default;
+		ShaderFilePaths(const char* vert, const char* frag) : vertPath{ vert }, fragPath{ frag } {};
 	};
 
 	struct MaterialCreateInfo 
 	{
-		MaterialCreateInfo() {};
-		MaterialCreateInfo(EngineDevice& deviceIn, VkRenderPass renderPassIn, 
-						ShaderFilePaths& shadersIn, std::vector<VkDescriptorSetLayout>& descriptorSetLayoutsIn)
-			: device(&deviceIn), renderPass(renderPassIn), 
-			shaderPaths(shadersIn), descriptorSetLayouts(descriptorSetLayoutsIn) {};
-		bool operator==(MaterialCreateInfo& b) const
-		{
-			return (shaderPaths.fragmentShaderPath == b.shaderPaths.fragmentShaderPath)
-				&& (shaderPaths.vertexShaderPath == b.shaderPaths.vertexShaderPath);
-		}
-		EngineDevice* device = nullptr; // needed for creating pipeline
+		MaterialCreateInfo(VkRenderPass renderPassIn, const ShaderFilePaths& shadersIn,
+						 std::vector<VkDescriptorSetLayout>& setLayoutsIn) : renderPass(renderPassIn), 
+			shaderPaths(shadersIn), descriptorSetLayouts(setLayoutsIn) {};
+		MaterialCreateInfo() = default;
+		ShaderFilePaths shaderPaths; // SPIR-V shaders
 		VkRenderPass renderPass = VK_NULL_HANDLE;
-		ShaderFilePaths shaderPaths; // directory paths to SPIR-V shaders
 		std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
 	};
 
+	// a material object is mainly an abstraction around VkPipeline
 	class Material 
 	{
 	public:
-		
-		Material(const MaterialCreateInfo& materialCreateInfo);
-
+		Material(const MaterialCreateInfo& matInfo, EngineDevice& deviceIn);
 		~Material();
 
-		// move constructor
-		Material(Material&& other) noexcept
-		{
-			pipelineLayout = other.pipelineLayout;
-			pipeline = std::move(other.pipeline); // transfer ownership of pipeline
-			info = other.info;
-		}
+		Material(const Material&) = delete;
+		Material& operator=(const Material&) = delete;
 
-		// the parameters this object was constructed from
-		MaterialCreateInfo info;
-		
-		EnginePipeline* getPipeline() { return pipeline.get(); }
-		VkPipelineLayout& getPipelineLayout() { return pipelineLayout; }
+		VkPipelineLayout getPipelineLayout() { return pipelineLayout; }
+
 		// binds this material's pipeline to the specified command buffer
-		void bindToCommandBuffer(VkCommandBuffer commandBuffer) { pipeline.get()->bind(commandBuffer); }
+		void bindToCommandBuffer(VkCommandBuffer commandBuffer);
 
-		struct MeshPushConstants 
+		struct MeshPushConstants
 		{ 
 			glm::mat4 transform{1.f};
 			glm::mat4 normalMatrix{1.f};
@@ -74,13 +74,18 @@ namespace EngineCore
 		void writePushConstantsForMesh(VkCommandBuffer commandBuffer, MeshPushConstants& data);
 		
 	private:
+		MaterialCreateInfo materialCreateInfo;
+		EngineDevice& device;
+		VkShaderModule vertexShaderModule;
+		VkShaderModule fragmentShaderModule;
 		VkPipelineLayout pipelineLayout;
-		// pipeline directly owned by the material
-		std::unique_ptr<EnginePipeline> pipeline{};
+		VkPipeline pipeline;
+		
+		static void defaultPipelineConfig(PipelineConfig& cfg);
 
+		void createShaderModule(const std::string& path, VkShaderModule* shaderModule);
 		void createPipelineLayout();
 		void createPipeline();
-
 	};
 
 } // namespace
