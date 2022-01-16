@@ -8,54 +8,51 @@
 #include <memory>
 #include <vector>
 #include <chrono> // timing
+#include <algorithm> // min()
 
 #include "ECS/StaticMesh.h"
 #include "ECS/Actor.h"
 #include "Types/CommonTypes.h"
 #include "Core/GPU/Memory/descriptors.h"
+#include "Core/EngineSettings.h"
 
 class SharedMaterialsPool;
 
 namespace EngineCore
 {
-	class EngineProgramTimer
+	class EngineClock
 	{
-		static const uint32_t deltasHistoryNum = 100;
 		using clock = std::chrono::steady_clock;
 		using timePoint = clock::time_point;
+		const double deltaMax = 0.2;
 	public:
-		EngineProgramTimer() : startTime{ clock::now() }{};
-		void deltaStart() { deltaStartTime = clock::now(); }
-		void deltaEnd()
+		EngineClock() : start{ clock::now() } {};
+		void measureFrameDelta(const uint32_t& currentframeIndex) 
 		{
-			std::chrono::duration<double, std::milli> ms = clock::now() - deltaStartTime;
-			recordDelta(ms.count() / 1000.0);
+			if (currentframeIndex != lastFrameIndex) /* new frame started? */
+			{
+				if (lastFrameIndex != 959) /* update delta (except on very first frame) */
+				{
+					std::chrono::duration<double, std::milli> ms = clock::now() - frameDeltaStart;
+					frameDelta = std::min(deltaMax, (ms.count() / 1000.0)); 
+				}
+				// reset timer
+				frameDeltaStart = clock::now();
+				lastFrameIndex = currentframeIndex;
+			}
 		}
-		double delta() const { return deltas[lastDeltaIndex]; }
-		uint32_t fps() const { return (uint32_t) 1.0 / avgDelta(); }
-		double elapsed() const
+		const double& getDelta() const { return frameDelta; }
+		uint32_t getFps() const { return (uint32_t) 1 / frameDelta; }
+		double getElapsed() const
 		{
-			std::chrono::duration<double, std::milli> ms = clock::now() - startTime;
+			std::chrono::duration<double, std::milli> ms = clock::now() - start;
 			return ms.count() / 1000.0;
 		}
 	private:
-		timePoint startTime;
-		timePoint deltaStartTime;
-		uint32_t lastDeltaIndex = 0;
-		double deltas[deltasHistoryNum] = { 0.0 };
-		void recordDelta(const double& ds) 
-		{
-			uint32_t i = lastDeltaIndex + 1;
-			if (i == deltasHistoryNum) { i = 0; }
-			deltas[i] = ds;
-			lastDeltaIndex = i;
-		}
-		double avgDelta() const
-		{
-			double v = 0.0;
-			for (double d : deltas) { v += d; }
-			return v / deltasHistoryNum;
-		}
+		timePoint start;
+		timePoint frameDeltaStart;
+		double frameDelta = 0.01;
+		uint32_t lastFrameIndex = 959;
 	};
 
 	// base class for an object representing the entire engine
@@ -66,6 +63,8 @@ namespace EngineCore
 		static constexpr int WIDTH = 1100;
 		static constexpr int HEIGHT = 720;
 
+		EngineRenderSettings renderSettings{};
+		
 		EngineApplication();
 		~EngineApplication();
 
@@ -77,7 +76,6 @@ namespace EngineCore
 
 	private:
 		void loadActors();
-
 		void setupDefaultInputs();
 
 		// engine application window (creates a window using GLFW) 
@@ -85,9 +83,9 @@ namespace EngineCore
 		// render device (instantiates vulkan)
 		EngineDevice device{ window };
 		// the renderer manages the swapchain and the vulkan command buffers
-		EngineRenderer renderer{ window, device };
+		EngineRenderer renderer{ window, device, renderSettings };
 
-		EngineProgramTimer epTimer{};
+		EngineClock engineClock{};
 
 		GlobalDescriptorSetManager globalDSetMgr{ device, EngineSwapChain::MAX_FRAMES_IN_FLIGHT };
 

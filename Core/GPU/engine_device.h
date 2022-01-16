@@ -49,6 +49,7 @@ namespace EngineCore
 		VkSurfaceKHR surface() { return surface_; }
 		VkQueue graphicsQueue() { return graphicsQueue_; }
 		VkQueue presentQueue() { return presentQueue_; }
+		VkInstance getVulkanInstance() { return instance; } // for imgui
 
 		SwapChainSupportDetails getSwapChainSupport() { return querySwapChainSupport(physicalDevice); }
 		uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
@@ -57,6 +58,8 @@ namespace EngineCore
 			const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 		// remember to compare against VK_NULL_HANDLE
 		VkPhysicalDevice& getPhysicalDevice() { return physicalDevice; }
+		// checks device properties to get the max samples supported for both color and depth
+		VkSampleCountFlagBits getMaxSampleCount();
 
 		// Buffer Helper Functions
 		void createBuffer(

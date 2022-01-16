@@ -1,28 +1,27 @@
 #pragma once
 
-#include "ActorComponent.h"
-
+#include "Core/Types/CommonTypes.h"
 #include <iostream>
 
-/* a virtual camera, not necessarily associated with an actor, thus owner might be null */
-class CameraComponent : public ActorComponent
+/* a virtual camera, this is you */
+class Camera
 {
 public:
-	CameraComponent()
+	Camera()
 	{
-		setNoParent(); // cameras do not always need parent actors
 	};
-	CameraComponent(const float& verticalFOV, const float& near, const float& far)
+	Camera(const float& verticalFOV, const float& near, const float& far)
 	{
-		setNoParent();
 		nearPlane = near;
 		farPlane = far;
 		setFOVh(verticalFOV);
 	};
 
-	CameraComponent& operator=(const CameraComponent&) = default;
-	CameraComponent& operator=(CameraComponent&&) = default;
-	bool operator==(CameraComponent* comparePtr) const { return comparePtr == this; }
+	Camera& operator=(const Camera&) = default;
+	Camera& operator=(Camera&&) = default;
+	bool operator==(Camera* comparePtr) const { return comparePtr == this; }
+
+	Transform transform;
 
 	/* camera settings */
 	float nearPlane = 0.01f;
@@ -32,7 +31,7 @@ public:
 
 	void setFOVh(const float& deg) { vFOV = (float)Transform::degToRad((float)deg); }
 
-	glm::mat4 getProjectionMatrix() 
+	glm::mat4 getProjectionMatrix_legacy() 
 	{
 		/*
 		float left = -aspectRatio;
@@ -73,7 +72,8 @@ public:
 		return lveMat;
 	}
 
-	glm::mat4 getProjectionMatrixBlender() 
+	// returns a 3D projection matrix, consistent with a certain free and open source program "B"
+	glm::mat4 getProjectionMatrix() 
 	{
 		// for X-forward Z-up: rotate camera 90 deg counter-clockwise on Y, 90 deg clockwise on X
 		const float b = nearPlane * tan(vFOV / 2);
@@ -198,50 +198,44 @@ public:
 		return pmatrix;
 	}
 
-	void moveInPlaneXZ(const Vector2D<double>& lookInput, const float& moveFwd, const float& moveRight, const float& moveUp, const float& deltaTime)
+	void moveInPlaneXY(const Vector2D<double>& lookInput, const float& moveFwd, const float& moveRight, const float& moveUp, const float& deltaTime)
 	{
-		float lookSpeed = 3.8f;
-		float moveSpeed = 0.3f;
+		float lookSpeed = 6.8f;
+		float moveSpeed = 1.f;
 
 		float yawInput = lookInput.x != 0 ? lookInput.x / abs(lookInput.x) : 0.f; 
 		float pitchInput = lookInput.y != 0 ? lookInput.y / abs(lookInput.y) : 0.f;
-		transform.rotation += lookSpeed * deltaTime * glm::vec3{ 0.f, pitchInput, -yawInput }; //glm::vec3{ 0.0, -lookInput.y, -lookInput.x };
+		auto rotV = Vec{ 0.f, pitchInput, -yawInput };
 
+		if (Vec::dot(rotV, rotV) > std::numeric_limits<float>::epsilon())
+		{ transform.rotation += rotV.getNormalized() * lookSpeed * deltaTime; }
+		
 		// limit pitch values to exactly 85 degrees
 		transform.rotation.y = glm::clamp(transform.rotation.y, 
 				(float)Transform::degToRad(-85.f), (float)Transform::degToRad(85.f));
 		// prevent overflow from continous yawing
 		transform.rotation.z = glm::mod(transform.rotation.z, glm::two_pi<float>());
 
-		float pitch = transform.rotation.y;
-		float yaw = transform.rotation.z; // lve: y
-		// lve: { sin(yaw), 0.f, cos(yaw) } new: //-sin(yaw), tan(pitch) (prev. sin), -cos(yaw)
-		//glm::vec3 forwardDir { -sin(yaw), tan(pitch), -cos(yaw) }; this applies to "vulkan-space" coordinates, not the custom system
-		glm::vec3 forwardDir{ -sin(yaw), tan(pitch), -cos(yaw) };
-		const glm::vec3 upDir{ 0.f, 0.f, 1.f };
-		const glm::vec3 rightDir = glm::normalize(glm::cross(glm::normalize(upDir), glm::normalize(forwardDir))); // lve: z, 0.f, -x (wtf???)
+		const Vec forwardDir = transform.getForwardVector();
+		const Vec rightDir = Vec{ forwardDir.y, -forwardDir.x, 0.f };
+		const Vec upDir{ 0.f, 0.f, 1.f };
 
-		//forwardDir = { 1.f, 0.f, 0.f };
-
-		glm::vec3 moveDir{ 0.f };
+		Vec moveDir{ 0.f };
 		if (moveFwd > 0.f) { moveDir += forwardDir; }
 		else if (moveFwd < 0.f) { moveDir -= forwardDir; }
 
-		if (moveRight > 0.f) { moveDir += glm::vec3{ 0.f, -1.f, 0.f }; }
-		else if (moveRight < 0.f) { moveDir -= glm::vec3{ 0.f, -1.f, 0.f }; }
+		if (moveRight > 0.f) { moveDir += rightDir; }
+		else if (moveRight < 0.f) { moveDir -= rightDir; }
 
-		if (moveUp > 0.f) { moveDir += glm::vec3{ 0.f, 0.f, 1.f }; }
-		else if (moveUp < 0.f) { moveDir -= glm::vec3{ 0.f, 0.f, 1.f }; }
+		if (moveUp > 0.f) { moveDir += upDir; }
+		else if (moveUp < 0.f) { moveDir -= upDir; }
 
-		if (glm::dot(moveDir, moveDir) > std::numeric_limits<float>::epsilon()) 
-		{
-			transform.translation += moveSpeed * deltaTime * glm::normalize(moveDir);
-		}
+		transform.translation += moveDir * moveSpeed * deltaTime;
 	}
 
 	static glm::mat4 getWorldBasisMatrix() 
 	{
-		/*	indentity matrix rearranged to swap axes,
+		/*	identity matrix rearranged to swap axes 
 		*	resulting in a right-handed z-up/x-forward basis:
 		*	-y (up) becomes z, x (right) becomes -y, z (forward) becomes x */
 		glm::mat4 basis{ 0.f };

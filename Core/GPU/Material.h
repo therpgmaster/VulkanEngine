@@ -2,6 +2,7 @@
 
 #include "Core/GPU/engine_device.h"
 #include "Core/GPU/Memory/Descriptors.h"
+#include "Core/EngineSettings.h"
 
 #include <glm/glm.hpp>
 
@@ -39,18 +40,33 @@ namespace EngineCore
 		ShaderFilePaths(const char* vert, const char* frag) : vertPath{ vert }, fragPath{ frag } {};
 	};
 
+	// holds common material-specific properties
+	struct MaterialShadingProperties 
+	{
+		MaterialShadingProperties() = default;
+
+		VkPrimitiveTopology primitiveType = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		VkPolygonMode polygonMode = VK_POLYGON_MODE_FILL;
+		VkCullModeFlags cullModeFlags = VK_CULL_MODE_BACK_BIT; // backface culling
+		float lineWidth = 1.f;
+	};
+
+	// holds all properties needed to create a material object (used to generate a pipeline config)
 	struct MaterialCreateInfo 
 	{
 		MaterialCreateInfo(VkRenderPass renderPassIn, const ShaderFilePaths& shadersIn,
-						 std::vector<VkDescriptorSetLayout>& setLayoutsIn) : renderPass(renderPassIn), 
-			shaderPaths(shadersIn), descriptorSetLayouts(setLayoutsIn) {};
-		MaterialCreateInfo() = default;
+						 std::vector<VkDescriptorSetLayout>& setLayoutsIn, const EngineRenderSettings& renderSettingsIn) 
+			: renderPass(renderPassIn), shaderPaths(shadersIn), descriptorSetLayouts(setLayoutsIn),
+			 engineRenderSettings(renderSettingsIn) {};
+		
+		MaterialShadingProperties shadingProperties{};
 		ShaderFilePaths shaderPaths; // SPIR-V shaders
 		VkRenderPass renderPass = VK_NULL_HANDLE;
 		std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+		const EngineRenderSettings& engineRenderSettings;
 	};
 
-	// a material object is mainly an abstraction around VkPipeline
+	// a material object is mainly an abstraction around a VkPipeline
 	class Material 
 	{
 	public:
@@ -81,7 +97,8 @@ namespace EngineCore
 		VkPipelineLayout pipelineLayout;
 		VkPipeline pipeline;
 		
-		static void defaultPipelineConfig(PipelineConfig& cfg);
+		static void getDefaultPipelineConfig(PipelineConfig& cfg);
+		static void applyMatPropsToPipelineConfig(const MaterialShadingProperties& mp, PipelineConfig& cfg);
 
 		void createShaderModule(const std::string& path, VkShaderModule* shaderModule);
 		void createPipelineLayout();

@@ -2,17 +2,67 @@
 
 #include <stdint.h>
 #include <glm/glm.hpp>
+#include "Core/Types/Math.h"
+#include <numeric>
+
+template<typename T = float>
+class Vector3D
+{
+public:
+	Vector3D<T>(const T& x_, const T& y_, const T& z_) : x{ x_ }, y{ y_ }, z{ z_ } {};
+	Vector3D<T>(const T& v) : x{ v }, y{ v }, z{ v } {};
+	Vector3D() : x{ 0 }, y{ 0 }, z{ 0 } {};
+	T x; T y; T z;
+	// operator mess, can be ignored
+	Vector3D operator+(const Vector3D& other) { return Vector3D{ x + other.x, y + other.y, z + other.z }; } // +
+	Vector3D operator-(const Vector3D& other) { return Vector3D{ x - other.x, y - other.y, z - other.z }; } // -
+	Vector3D operator*(const Vector3D& other) { return Vector3D{ x * other.x, y * other.y, z * other.z }; } // *
+	Vector3D operator/(const Vector3D& other) { return Vector3D{ x / other.x, y / other.y, z / other.z }; } // /
+	Vector3D operator+=(const Vector3D& other) { *this = *this + other; return *this; } // Vector += Vector
+	Vector3D operator-=(const Vector3D& other) { *this = *this - other; return *this; } // Vector -= Vector
+
+	Vector3D<float> operator+(const float& f) { return *this + Vector3D<float>(f, f, f); } // Vector + float
+	Vector3D<float> operator-(const float& f) { return *this - Vector3D<float>(f, f, f); } // Vector - float
+	Vector3D<float> operator*(const float& f) { return *this * Vector3D<float>(f, f, f); } // Vector * float
+	
+#ifdef GLM_VERSION
+	Vector3D<T>(const glm::vec3& g) : x{ g.x }, y{ g.y }, z{ g.z } {};
+	operator glm::vec3() { return glm::vec3( x, y, z ); }
+#endif
+	static float dot(const Vector3D<T>& a, const Vector3D<T>& b) 
+	{ return (a.x * b.x) + (a.y * b.y) + (a.z * b.z); }
+	static Vector3D<T> cross(const Vector3D<T>& a, const Vector3D<T>& b) 
+	{ return ((a.y * b.z - b.y * a.z), (a.z * b.x - b.z * a.x), (a.x * b.y - b.x * a.y)); }
+	Vector3D<T> getNormalized() const 
+	{ 
+		Vector3D<T> v = *this;
+		float dotp = dot(v, v); // magnitude squared
+		if (dotp < std::numeric_limits<float>::epsilon()) { return Vector3D(); }
+		return v * Math::invSqrt(dotp);
+	}
+	
+
+};
+// shorthand (alias) for a 3D float Vector, always use this unless you need double precision
+using Vec = Vector3D<float>;
+// additional float-Vector operators
+//Vec operator+(Vec v, float f) { return v + Vec(f, f, f); } // Vector + float
+//Vec operator-(Vec v, float f) { return v - Vec(f, f, f); } // Vector - float
+//Vec operator*(Vec v, float f) { return v * Vec(f, f, f); } // Vector * float
+//Vec operator+(float f, Vec v) { return Vec(v.x + f, v.y + f, v.z + f); } // float + Vector
+//Vec operator*(float f, Vec v) { return Vec(v.x * f, v.y * f, v.z * f); } // float * Vector
+
 
 struct Transform
 {
-	glm::vec3 translation{};
-	glm::vec3 scale{ 1.f, 1.f, 1.f };
-	glm::vec3 rotation{};
+	Vec translation{};
+	Vec scale{ 1.f, 1.f, 1.f };
+	Vec rotation{};
 
 	glm::mat4 mat4() const { return makeMatrix(rotation, scale, translation); }
 
-	glm::mat4 makeMatrix(const glm::vec3& rotationIn, const glm::vec3& scaleIn, 
-				const glm::vec3& translationIn = { 0.f, 0.f, 0.f }) const
+	static glm::mat4 makeMatrix(const Vec& rotationIn, const Vec& scaleIn,
+		const Vec& translationIn = { 0.f, 0.f, 0.f })
 	{
 		/* returns Translation * Rz * Ry * Rx * Scale
 		* Tait-bryan angles Z(1)-Y(2)-X(3) rotation order
@@ -47,38 +97,43 @@ struct Transform
 		};
 	}
 
-	glm::mat4 makeMatrix(const glm::vec3& rotationIn) const { return makeMatrix(rotationIn, { 1.f, 1.f, 1.f }); }
+	static glm::mat4 makeMatrix(const Vec& rotationIn) { return makeMatrix(rotationIn, { 1.f, 1.f, 1.f }); }
 
-	glm::vec3 getForwardVector() const
+	Vec getForwardVector() const
 	{
-		return { sin(rotation.y), 0.f, cos(rotation.y) };
-		//return rotateVector(quaternionFromRotation(rotation), glm::vec3{ 1.f, 0.f, 0.f });
+		// get "forward" unit vector (x axis with rotation applied)
+		return Transform::rotateVector(Vec{ 1.f, 0.f, 0.f }, rotation);
 	}
 
 	static double degToRad(const double& degrees) { return (degrees * 0.01745329251); }
 
-	static glm::vec3 rotateVector(const glm::vec4& rotQuat, const glm::vec3& v3)
+	static Vec rotateVector(const Vec& v3, const Vec& rot)
+	{
+		// returns vector rotated by rotation matrix
+		glm::vec4 r = Transform::makeMatrix(rot) * glm::vec4{ v3.x, v3.y, v3.z, 0.f };
+		return Vec(r.x, r.y, r.z);
+	}
+
+	static Vec rotateVectorQuaternion(const Vec& v3, const glm::vec4& rot)
 	{
 		const glm::vec4 v4 = { v3.x, v3.y, v3.z, 0.f };
-		glm::vec4 qw = { rotQuat.w, rotQuat.w, rotQuat.w, rotQuat.w };
+		glm::vec4 qw = { rot.w, rot.w, rot.w, rot.w };
 		// cross product of vector and quat-rotation, times 2
-		glm::vec4 t = crossVec4(rotQuat, v4);
+		glm::vec4 t = crossVec4(rot, v4);
 		t = t + t;
-		glm::vec4 r = ((qw * t) + v4) + crossVec4(rotQuat, t);
+		const glm::vec4 r = ((qw * t) + v4) + crossVec4(rot, t);
 		return { r.x, r.y, r.z };
 	}
 
 	// replacement for missing overload of cross() that accepts 4-component vectors (w=0)
 	static glm::vec4 crossVec4(const glm::vec4& a, const glm::vec4& b)
 	{
-		const glm::vec3 a3 = { a.x, a.y, a.z };
-		const glm::vec3 b3 = { b.x, b.y, b.z };
-		glm::vec3 p = glm::cross(a3, b3);
-		return glm::vec4{ p.x, p.y, p.z, 0.f };
+		const auto r = Vec::cross({ a.x, a.y, a.z }, { b.x, b.y, b.z });
+		return glm::vec4(r.x, r.y, r.z, 0.f);
 	}
 
 	// assumes yaw = z, pitch = y, roll = x
-	static glm::vec4 quaternionFromRotation(const glm::vec3& v)
+	static glm::vec4 quaternionFromRotation(const Vec& v)
 	{
 		// abbreviations for the angular functions
 		const auto cy = cos(v.z); // in original formula all components were * 0.5 (halved)
@@ -109,20 +164,7 @@ private:
 	bool updated = true;
 };
 
-template<class T = float>
-class Vector
-{
-	Vector<T>(const T& x_, const T& y_, const T& z_) : x{ x_ }, y{ y_ }, z{ z_ } {};
-	Vector<T>(const T& v) : x{ v }, y{ v }, z{ v } {};
-	Vector() : x{ 0 }, y{ 0 }, z{ 0 } {};
-	T x; T y; T z;
-	Vector operator+(const Vector& other) { return Vector{ x + other.x, y + other.y, z + other.z }; }
-	Vector operator-(const Vector& other) { return Vector{ x - other.x, y - other.y, z - other.z }; }
-	Vector operator*(const Vector& other) { return Vector{ x * other.x, y * other.y, z * other.z }; }
-	Vector operator/(const Vector& other) { return Vector{ x / other.x, y / other.y, z / other.z }; }
-};
-
-template<class T = float>
+template<typename T = float>
 class Vector2D 
 {
 public:

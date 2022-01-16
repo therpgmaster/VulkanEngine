@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Core/GPU/engine_device.h"
-#include "Core/GPU/Pipeline.h"
+#include "Core/GPU/Material.h"
 
 // glm
 #include <glm/gtc/matrix_transform.hpp>
@@ -10,7 +10,7 @@
 #include <vector>
 #include <cmath> // only used in perspective calculation
 
-class CameraComponent;
+class Camera;
 #include "ECS/StaticMesh.h"
 
 namespace EngineCore
@@ -25,8 +25,8 @@ namespace EngineCore
 		MeshRenderSystem& operator=(const MeshRenderSystem&) = delete;
 
 		void renderMeshes(VkCommandBuffer commandBuffer, std::vector<StaticMesh*>& meshes,
-							CameraComponent* camera, const float& deltaTimeSeconds, float time,
-							InputSystem* inputSysPtr, VkDescriptorSet sceneGlobalDescriptorSet);
+						const float& deltaTimeSeconds, float time, VkDescriptorSet sceneGlobalDescriptorSet);
+							
 
 	private:
 		EngineDevice& device;

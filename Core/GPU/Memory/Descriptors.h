@@ -102,9 +102,9 @@ namespace EngineCore
 	struct SceneGlobalDataBuffer
 	{
 		glm::mat4 projectionViewMatrix{ 1.f };
-		glm::vec4 ambientLightColor{ 1.f, 1.f, 1.f, .2f };  // w = intensity
+		glm::vec4 ambientLightColor{ 1.f, 1.f, 1.f, .16f };  // w = intensity
 		glm::vec3 lightPosition{ -1.f };
-		alignas(16) glm::vec4 lightColor{ 1.f };  // w = intensity
+		alignas(16) glm::vec4 lightColor{ 0.1f, 0.4f, 0.8f, 12.f };  // w = intensity
 	};
 
 	class GlobalDescriptorSetManager 

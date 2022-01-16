@@ -1,22 +1,19 @@
 #include "ActorComponent.h"
 #include "Actor.h"
+#include <cassert>
 
 
 ActorComponent::~ActorComponent() 
 {
-	if (hasOwner) 
+	if (parentActor)
 	{
 		// when this component is destroyed, we must report it to the parent actor
 		parentActor->componentPendingDeletion(this);
 	}
 }
 
-bool ActorComponent::setNoParent() 
+void ActorComponent::setParentActor(Actor& parent) 
 {
-	if (parentActor == nullptr)
-	{
-		hasOwner = false;
-		return true;
-	}
-	return false;
+	assert(!parentActor && "cannot set parent actor, component already has a parent");
+	if (!parentActor) { parentActor = &parent; }
 }

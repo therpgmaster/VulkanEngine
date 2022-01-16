@@ -11,7 +11,7 @@
 
 // included here because warning-ignore hack only works in header files
 #pragma warning(push, 0)
-#include "../../ThirdParty/tiny_obj_loader.h"
+#include "ThirdParty/tiny_obj_loader.h"
 #pragma warning(pop)
 
 // std

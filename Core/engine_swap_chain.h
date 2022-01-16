@@ -20,10 +20,11 @@ namespace EngineCore {
 	public:
 		static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
-		EngineSwapChain(EngineDevice& deviceRef, VkExtent2D windowExtent);
-		EngineSwapChain(EngineDevice& deviceRef, VkExtent2D windowExtent, std::shared_ptr<EngineSwapChain> previous);
+		EngineSwapChain(EngineDevice& deviceRef, VkExtent2D extent, VkSampleCountFlagBits samples);
+		EngineSwapChain(EngineDevice& deviceRef, VkExtent2D extent, VkSampleCountFlagBits samples,
+						std::shared_ptr<EngineSwapChain> previous);
 		~EngineSwapChain();
-		void init();
+		void init(VkSampleCountFlagBits samples);
 
 		EngineSwapChain(const EngineSwapChain&) = delete;
 		EngineSwapChain& operator=(const EngineSwapChain&) = delete;
@@ -53,8 +54,9 @@ namespace EngineCore {
 	private:
 		void createSwapChain();
 		void createImageViews();
-		void createDepthResources();
-		void createRenderPass();
+		void createDepthResources(VkSampleCountFlagBits samples);
+		void createColorResources(VkSampleCountFlagBits samples);
+		void createRenderPass(VkSampleCountFlagBits samples);
 		void createFramebuffers();
 		void createSyncObjects();
 
@@ -77,6 +79,10 @@ namespace EngineCore {
 		std::vector<VkImageView> depthImageViews;
 		std::vector<VkImage> swapChainImages;
 		std::vector<VkImageView> swapChainImageViews;
+
+		std::vector<VkImage> multisampleImages;
+		std::vector<VkDeviceMemory> multisampleImageMemorys;
+		std::vector<VkImageView> multisampleImageViews;
 
 		EngineDevice& device;
 		VkExtent2D windowExtent;

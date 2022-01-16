@@ -28,5 +28,5 @@ void main()
   gl_Position = globalFrameData.projectionViewMatrix * push.transform * position;
   fragNormalWS = normalize(mat3(push.normalMatrix) * normal);
   fragPositionWS = vec4(push.transform * position).xyz;
-  fragColor = vec3(0.8, 0.6, 0.6); // use fixed value instead of vertex color
+  fragColor = vec3(1.0, 1.0, 1.0); // hardcoded
 }

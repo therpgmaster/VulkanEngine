@@ -7,11 +7,10 @@
 
 // image importer, can only be defined in one (source) file
 #define STB_IMAGE_IMPLEMENTATION
-#include "Core/../ThirdParty/stb_image.h"
+#include "ThirdParty/stb_image.h"
 
 namespace EngineCore 
 {
-
 	// local callback functions
 	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 		VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -167,6 +166,9 @@ namespace EngineCore
 
 		VkPhysicalDeviceFeatures deviceFeatures = {};
 		deviceFeatures.samplerAnisotropy = VK_TRUE;
+		deviceFeatures.fillModeNonSolid = VK_TRUE;
+		deviceFeatures.wideLines = VK_TRUE;
+		deviceFeatures.largePoints = VK_TRUE;
 
 		VkDeviceCreateInfo createInfo = {};
 		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -177,17 +179,6 @@ namespace EngineCore
 		createInfo.pEnabledFeatures = &deviceFeatures;
 		createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
 		createInfo.ppEnabledExtensionNames = deviceExtensions.data();
-
-		// TODO "might not really be necessary anymore because device specific validation layers have been deprecated"
-		/*if (enableValidationLayers) 
-		{
-			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-			createInfo.ppEnabledLayerNames = validationLayers.data();
-		}
-		else 
-		{
-			createInfo.enabledLayerCount = 0;
-		}*/
 
 		if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device_) != VK_SUCCESS) 
 		{
@@ -431,6 +422,19 @@ namespace EngineCore
 			}
 		}
 		throw std::runtime_error("failed to find suitable memory type!");
+	}
+
+	VkSampleCountFlagBits EngineDevice::getMaxSampleCount() 
+	{
+		VkSampleCountFlags counts = properties.limits.framebufferColorSampleCounts 
+									& properties.limits.framebufferDepthSampleCounts;
+		if (counts & VK_SAMPLE_COUNT_64_BIT) { return VK_SAMPLE_COUNT_64_BIT; }
+		if (counts & VK_SAMPLE_COUNT_32_BIT) { return VK_SAMPLE_COUNT_32_BIT; }
+		if (counts & VK_SAMPLE_COUNT_16_BIT) { return VK_SAMPLE_COUNT_16_BIT; }
+		if (counts & VK_SAMPLE_COUNT_8_BIT) { return VK_SAMPLE_COUNT_8_BIT; }
+		if (counts & VK_SAMPLE_COUNT_4_BIT) { return VK_SAMPLE_COUNT_4_BIT; }
+		// here we assume that the GPU supports multisampling even if it claims otherwise
+		return VK_SAMPLE_COUNT_2_BIT;
 	}
 
 	void EngineDevice::createBuffer(VkDeviceSize size,VkBufferUsageFlags usage,

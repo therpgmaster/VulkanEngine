@@ -11,7 +11,7 @@
 
 namespace EngineCore 
 {
-	Material::Material(const MaterialCreateInfo& matInfo, EngineDevice& deviceIn) 
+	Material::Material(const MaterialCreateInfo& matInfo, EngineDevice& deviceIn)
 						: device{ deviceIn }, materialCreateInfo{ matInfo }
 	{
 		if (materialCreateInfo.descriptorSetLayouts.empty()) { throw std::runtime_error("material error, no descriptor set layouts specified"); }
@@ -54,7 +54,7 @@ namespace EngineCore
 		{ throw std::runtime_error("pipeline error, could not create shader module"); }
 	}
 
-	void Material::defaultPipelineConfig(PipelineConfig& cfg)
+	void Material::getDefaultPipelineConfig(PipelineConfig& cfg)
 	{
 		cfg.inputAssemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 		cfg.inputAssemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -78,10 +78,10 @@ namespace EngineCore
 		cfg.rasterizationInfo.depthBiasClamp = 0.0f;           // Optional
 		cfg.rasterizationInfo.depthBiasSlopeFactor = 0.0f;     // Optional
 
-		// multisampling (MSAA)
+		// multisampling
 		cfg.multisampleInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 		cfg.multisampleInfo.sampleShadingEnable = VK_FALSE;
-		cfg.multisampleInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+		cfg.multisampleInfo.rasterizationSamples = VK_SAMPLE_COUNT_4_BIT; // MSAA samples, overwritten later
 		cfg.multisampleInfo.minSampleShading = 1.0f;           // Optional
 		cfg.multisampleInfo.pSampleMask = nullptr;             // Optional
 		cfg.multisampleInfo.alphaToCoverageEnable = VK_FALSE;  // Optional
@@ -127,6 +127,31 @@ namespace EngineCore
 		cfg.dynamicStateInfo.flags = 0;
 	}
 
+	// modifies the config to match the provided material properties
+	void Material::applyMatPropsToPipelineConfig(const MaterialShadingProperties& mp, PipelineConfig& cfg)
+	{
+		cfg.inputAssemblyInfo.topology = mp.primitiveType;
+		cfg.rasterizationInfo.cullMode = mp.cullModeFlags;
+		// vkCmdSetLineWidth can modify line width without needing to recreate the pipeline
+		cfg.rasterizationInfo.lineWidth = mp.lineWidth; 
+		cfg.rasterizationInfo.polygonMode = mp.polygonMode;
+
+		// alpha blending for transparent surfaces, most commonly VK_BLEND_OP_ADD
+		cfg.colorBlendAttachment.blendEnable = VK_TRUE; // default color blend mode
+		cfg.colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+		cfg.colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+		cfg.colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+		cfg.colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		cfg.colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+		cfg.colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+		// logic op is an alternate way of blending colors, replaces the default mode if enabled
+		cfg.colorBlendInfo.logicOpEnable = VK_FALSE;
+		// one VkPipelineColorBlendAttachmentState for each color attachment in the framebuffer
+		cfg.colorBlendInfo.attachmentCount = 1; 
+		cfg.colorBlendInfo.pAttachments = &cfg.colorBlendAttachment;
+
+	}
+
 	void Material::createPipelineLayout()
 	{
 		VkPushConstantRange pushConstRange{};
@@ -146,16 +171,25 @@ namespace EngineCore
 
 	void Material::createPipeline()
 	{
+		auto& matInfo = materialCreateInfo; // alias
 		PipelineConfig cfg{};
-		defaultPipelineConfig(cfg); // get default pipeline config
-		cfg.renderPass = materialCreateInfo.renderPass;
-		cfg.pipelineLayout = pipelineLayout;
 
-		assert(cfg.pipelineLayout != VK_NULL_HANDLE && "pipeline error, null pipelineLayout");
-		assert(cfg.renderPass != VK_NULL_HANDLE && "pipeline error, null renderPass");
+		// initialize pipeline config to static defaults
+		getDefaultPipelineConfig(cfg);
+		// modify config with material shading properties
+		applyMatPropsToPipelineConfig(matInfo.shadingProperties, cfg);
+		cfg.renderPass = matInfo.renderPass;
+		cfg.pipelineLayout = pipelineLayout;
+		
+		// set pipeline's multisample count (MSAA samples per pixel) to the current engine-global setting
+		cfg.multisampleInfo.rasterizationSamples = matInfo.engineRenderSettings.sampleCountMSAA;
+
+		assert(cfg.pipelineLayout != VK_NULL_HANDLE && "pipeline creation error, null pipelineLayout");
+		assert(cfg.renderPass != VK_NULL_HANDLE && "pipeline creation error, null renderPass");
+
 		// load shaders
-		createShaderModule(materialCreateInfo.shaderPaths.vertPath, &vertexShaderModule); 
-		createShaderModule(materialCreateInfo.shaderPaths.fragPath, &fragmentShaderModule);
+		createShaderModule(matInfo.shaderPaths.vertPath, &vertexShaderModule); 
+		createShaderModule(matInfo.shaderPaths.fragPath, &fragmentShaderModule);
 		// vertex shader stage
 		VkPipelineShaderStageCreateInfo shaderStages[2]{};
 		shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;

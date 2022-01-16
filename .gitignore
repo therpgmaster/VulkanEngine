@@ -43,3 +43,4 @@ Core/Shaders/compile_shaders_glsl.bat
 *.user
 *.blend
 *.blend1
+Core/DevResources/Shaders/compile_shaders_glsl.bat

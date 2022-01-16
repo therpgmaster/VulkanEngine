@@ -29,5 +29,5 @@ void main()
 	vec3 lightAmbient = globalFrameData.ambientLightColor.xyz * globalFrameData.ambientLightColor.w;
 	vec3 lightDiffuse = lightColor * max(dot(normalize(fragNormalWS), normalize(dirToLight)), 0);
 
-	outColor = vec4((lightDiffuse + lightAmbient) * fragColor, 1.0);
+	outColor = vec4((lightDiffuse + lightAmbient) * fragColor, 0.6);
 }

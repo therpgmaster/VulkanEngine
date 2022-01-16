@@ -36,7 +36,7 @@ namespace EngineCore
 		uint32_t vertexSize = sizeof(vertices[0]);
 		// temporary buffer to transfer from CPU (host) to GPU (device)
 		GBuffer stagingBuffer
-		{ 
+		{
 			engineDevice, vertexSize, vertexCount,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT

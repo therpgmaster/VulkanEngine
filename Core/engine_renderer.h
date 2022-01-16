@@ -3,6 +3,7 @@
 #include "Core/engine_window.h"
 #include "Core/GPU/engine_device.h"
 #include "Core/engine_swap_chain.h"
+#include "Core/EngineSettings.h"
 
 // std
 #include <memory>
@@ -14,11 +15,12 @@ namespace EngineCore
 	class EngineRenderer
 	{
 	public:
-		EngineRenderer(EngineWindow& windowIn, EngineDevice& deviceIn);
+		EngineRenderer(EngineWindow& windowIn, EngineDevice& deviceIn, EngineRenderSettings& renderSettingsIn);
 		~EngineRenderer();
 		EngineRenderer(const EngineRenderer&) = delete;
 		EngineRenderer& operator=(const EngineRenderer&) = delete;
 
+		
 		VkRenderPass getSwapchainRenderPass() const { return swapchain->getRenderPass(); }
 		bool getIsFrameInProgress() const { return isFrameStarted; }
 		VkCommandBuffer getCurrentCommandBuffer() const 
@@ -45,10 +47,10 @@ namespace EngineCore
 		void freeCommandBuffers();
 		void recreateSwapchain();
 
-		// reference to the application window (using GLFW) 
 		EngineWindow& window;
-		// reference to the vulkan render device (gpu) wrapper
 		EngineDevice& device;
+		EngineRenderSettings& renderSettings;
+
 		// graphics swap chain
 		std::unique_ptr<EngineSwapChain> swapchain;
 		// command buffers

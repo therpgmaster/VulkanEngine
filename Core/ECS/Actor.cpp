@@ -1,33 +1,32 @@
 #include "Actor.h"
 #include "ActorComponent.h"
 #include "StaticMesh.h"
+#include <cassert>
+
+Actor::~Actor() 
+{
+	for (auto* c : components) { removeComponent(c); }
+}
 
 void Actor::registerComponent(ActorComponent& component, const bool& enableComponentTick, const bool& hasMesh)
 {
+	assert(!component.getParentActor() && "cannot register component which already has a parent");
 	component.setParentActor(*this);
-	components.push_back(&component); // add to vector of registered components
-	if (hasMesh) { meshComponents.push_back( (StaticMesh*) &component ); }
-	if (component.getComponentHasPhysicalPresence() || hasMesh) 
-	{ hasPhysicalPresence = true; }
-}
-
-void Actor::unregisterComponent(ActorComponent& component) 
-{
-	// move the destroyed component to end of vector and remove it
-	std::vector<ActorComponent*>::iterator newEnd = std::remove(components.begin(), components.end(), &component);
-	components.erase(newEnd, components.end());
-	components.shrink_to_fit(); // free unused memory
+	components.push_back(&component); // add to array of registered components
 }
 
 void Actor::removeComponent(ActorComponent* component)
 {
-	if (component == nullptr) { return; }
-	unregisterComponent(*component);
-	delete component;
+	assert(component && "tried to remove null component");
+	assert(component->getParentActor() == this && "tried to remove component of another actor, bad practice");
+	delete component; // component must notify its parent during deletion 
 }
 
-std::vector<StaticMesh*> Actor::getAllMeshComponents()
+void Actor::componentPendingDeletion(ActorComponent* component) 
 {
-	if (meshComponents.empty()) { return std::vector<StaticMesh*>{ nullptr }; }
-	return meshComponents;
+	for (uint32_t i = 0; i < components.size(); i++) 
+	{
+		if (components[i] == component) { components.erase(std::next(components.begin(), i)); }
+	}
+	components.shrink_to_fit();
 }

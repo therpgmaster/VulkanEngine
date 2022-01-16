@@ -1,9 +1,11 @@
 #include "application.h"
 #include "mesh_rendersys.h"
+#include "sky_rendersys.h"
 
-#include "ECS/CameraComponent.h"
+#include "Core/Camera.h"
 #include "Core/GPU/Material.h"
 #include "Core/GPU/Memory/Buffer.h"
+#include "Core/GUI_Interface.h"
 
 #include <stdexcept>
 #include <array>
@@ -24,14 +26,23 @@ namespace EngineCore
 
 	EngineApplication::~EngineApplication() {};
 
-	
-
 	void EngineApplication::startExecution()
 	{
-		MeshRenderSystem renderSys{ device, renderer.getSwapchainRenderPass() };
+		MeshRenderSystem meshRenderSys{ device, renderer.getSwapchainRenderPass() };
+
+		// global descriptor set layout
+		std::vector<VkDescriptorSetLayout> setLayout =
+		{ globalDSetMgr.sceneGlobalSetLayout.get()->getDescriptorSetLayout() };
+
+		// prepare for sky rendering TODO: move this somewhere else
+		ShaderFilePaths skyShaders("G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/sky.vert.spv",
+								"G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/sky.frag.spv");
+		MaterialCreateInfo skyMatInfo(renderer.getSwapchainRenderPass(), skyShaders, setLayout, renderSettings);
+
+		SkyRenderSystem skyRenderSys{ "G:/VulkanDev/VulkanEngine/Core/DevResources/Meshes/skysphere.obj", skyMatInfo, device };
 		
-		// TODO: this is a temporary single-camera setup, remember that we also delete this object below
-		CameraComponent* camera = new CameraComponent(45.f, 0.8f, 10.f);
+		// TODO: this is a temporary single-camera setup
+		Camera camera{ 45.f, 0.8f, 10.f };
 		
 		// input setup
 		window.input.captureMouseCursor(true);
@@ -40,67 +51,77 @@ namespace EngineCore
 		// TODO: hardcoded paths - create test material
 		ShaderFilePaths shaders("G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader.vert.spv",
 			"G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader.frag.spv");
-		std::vector<VkDescriptorSetLayout> setLayouts =
-		{ globalDSetMgr.sceneGlobalSetLayout.get()->getDescriptorSetLayout() };
-		MaterialCreateInfo matInfo(renderer.getSwapchainRenderPass(), shaders, setLayouts);
+		MaterialCreateInfo matInfo(renderer.getSwapchainRenderPass(), shaders, setLayout, renderSettings);
+
 		if (loadedMeshes.size() > 0 && loadedMeshes[0]) { for (auto* m : loadedMeshes) { m->setMaterial(matInfo); } }
 		else { throw std::runtime_error("could not access loaded mesh"); }
+
+		// create gui container (EXPERIMENTAL)
+		Imgui imguiObj{ window, device, renderer.getSwapchainRenderPass(),
+					EngineSwapChain::MAX_FRAMES_IN_FLIGHT, WIDTH, HEIGHT, renderSettings.sampleCountMSAA };
 
 		// window event loop
 		while (!window.getCloseWindow()) 
 		{
-			epTimer.deltaStart();
-			//std::cout << " FPS " << getFps(deltaTime) << " time(s) " << elapsedTime << "\n";
 			window.input.resetInputValues(); // set all input values to zero
-			window.input.updateBoundInputs(); // get input states
+			window.input.updateBoundInputs(); // get new input states
 			window.pollEvents();
 			// render frame
 			if (auto commandBuffer = renderer.beginFrame()) 
 			{
 				int frameIndex = renderer.getFrameIndex();
+				engineClock.measureFrameDelta(frameIndex);
 
 				// update scene global descriptors
 				SceneGlobalDataBuffer bufferData{};
-				bufferData.projectionViewMatrix = camera->getProjectionMatrixBlender()
-					* CameraComponent::getWorldBasisMatrix() * camera->getViewMatrix(true);
+				bufferData.projectionViewMatrix = camera.getProjectionMatrix()
+					* Camera::getWorldBasisMatrix() * camera.getViewMatrix(true);
 				globalDSetMgr.writeToSceneGlobalBuffer(frameIndex, bufferData, true);
 
+				//imguiObj.newFrame(); // imgui
+
 				renderer.beginSwapchainRenderPass(commandBuffer);
+
+				//imguiObj.demo(); // imgui demo
+				//ImGui::Text("Hello, world %d", 123);
+				//ImGui::Button("Save");
+				
+				// render sky sphere
+				skyRenderSys.renderSky(commandBuffer, globalDSetMgr.sceneGlobalSets[frameIndex], camera.transform.translation);
 				// render meshes
-				renderSys.renderMeshes(commandBuffer, loadedMeshes, camera, epTimer.delta(), epTimer.elapsed(),
-									 &window.input, globalDSetMgr.sceneGlobalSets[frameIndex]);
+				meshRenderSys.renderMeshes(commandBuffer, loadedMeshes, engineClock.getDelta(), engineClock.getElapsed(),
+											globalDSetMgr.sceneGlobalSets[frameIndex]);
+				
+				//imguiObj.render(commandBuffer); // imgui
+
+				// camera movement
+				auto lookInput = window.input.getMouseDelta();
+				auto mf = window.input.getAxisValue(0);
+				auto mr = window.input.getAxisValue(1);
+				auto mu = window.input.getAxisValue(2);
+				camera.moveInPlaneXY(lookInput, mf, mr, mu, engineClock.getDelta());
+
 				renderer.endSwapchainRenderPass(commandBuffer);
 				renderer.endFrame(); // submit command buffer
-				camera->aspectRatio = renderer.getAspectRatio();
+				camera.aspectRatio = renderer.getAspectRatio();
 			}
-			epTimer.deltaEnd();
 		}
-		delete camera;
-		vkDeviceWaitIdle(device.device()); // block until GPU finished
-		std::cout << "FPS: " << epTimer.fps() << " Elapsed: " << (float)epTimer.elapsed();
+		// window pending close, wait for GPU
+		vkDeviceWaitIdle(device.device());
 	}
 
 	void EngineApplication::loadActors() 
 	{
 		
 		StaticMesh::MeshBuilder builder{};
-		builder.loadFromFile("G:/VulkanDev/VulkanEngine/Core/DevResources/Meshes/torus.obj"); // TODO: hardcoded paths
+		builder.loadFromFile("G:/VulkanDev/VulkanEngine/Core/DevResources/Meshes/6star.obj"); // TODO: hardcoded paths
 
-		// create objects
-		for (int i = 0; i < 6; i++) 
-		{
-			glm::vec3 positions[]
-			{
-				{ 1.f, 0.f, 0.f },
-				{ -1.f, 0.f, 0.f },
-				{ 0.f, 1.f, 0.f },
-				{ 0.f, -1.f, 0.f },
-				{ 0.f, 0.f, 1.f },
-				{ 0.f, 0.f, -1.f },
-			};
+		for (uint32_t i = 0; i < 600; i++) 
+		{ 
 			loadedMeshes.push_back(new StaticMesh(device, builder));
-			loadedMeshes[i]->transform.translation = positions[i];
+			loadedMeshes[i]->transform.translation.x = 0.5f * i;
 		}
+
 	}
 
 	void EngineApplication::setupDefaultInputs()

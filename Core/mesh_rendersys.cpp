@@ -1,6 +1,6 @@
 #include "mesh_rendersys.h"
 
-#include "ECS/CameraComponent.h"
+#include "Core/Camera.h"
 
 #include <stdexcept>
 #include <array>
@@ -16,8 +16,8 @@
 namespace EngineCore
 {
 	void MeshRenderSystem::renderMeshes(VkCommandBuffer commandBuffer, std::vector<StaticMesh*>& meshes,
-			CameraComponent* camera, const float& deltaTimeSeconds, float time, InputSystem* inputSysPtr, 
-			VkDescriptorSet sceneGlobalDescriptorSet)
+			const float& deltaTimeSeconds, float time, VkDescriptorSet sceneGlobalDescriptorSet)
+			
 	{
 		for (auto* pMesh : meshes)
 		{
@@ -30,10 +30,9 @@ namespace EngineCore
 			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, material.getPipelineLayout(),
 									0, 1, &sceneGlobalDescriptorSet, 0, nullptr);
 
-			// spin 3D primitive - TODO: remove
-			float spinRate = 0.0f;
-			mesh.transform.rotation.y = glm::mod(mesh.transform.rotation.y + (spinRate * deltaTimeSeconds), glm::two_pi<float>());
-			mesh.transform.rotation.x = glm::mod(mesh.transform.rotation.x + ((spinRate / 2.f) * deltaTimeSeconds), glm::two_pi<float>());
+			// spin 3D primitive - demo
+			float spinRate = 0.0f;//0.8f;
+			mesh.transform.rotation.z = glm::mod(mesh.transform.rotation.z + (spinRate * deltaTimeSeconds), glm::two_pi<float>());
 
 			/*if (camera != nullptr)
 			{
@@ -59,17 +58,11 @@ namespace EngineCore
 			else 
 			{ throw std::runtime_error("renderEngineObjects null camera pointer"); }*/
 
-			auto lookInput = inputSysPtr->getMouseDelta();
-			auto mf = inputSysPtr->getAxisValue(0);
-			auto mr = inputSysPtr->getAxisValue(1);
-			auto mu = inputSysPtr->getAxisValue(2);
-			camera->moveInPlaneXZ(lookInput, mf, mr, mu, deltaTimeSeconds);
-
 			/* view matrix and mesh transform matrix
-			glm::mat4 projectionMatrix = camera->getProjectionMatrixBlender();
+			glm::mat4 projectionMatrix = camera->getProjectionMatrix();
 			glm::mat4 viewMatrix = camera->getViewMatrix(true);
 			glm::mat4 meshMatrix =  mesh.transform.mat4();
-			glm::mat4 worldMatrix = CameraComponent::getWorldBasisMatrix();
+			glm::mat4 worldMatrix = Camera::getWorldBasisMatrix();
 			// old way of sending matrices to gpu
 			push.transform = projectionMatrix * worldMatrix * viewMatrix * meshMatrix;
 			vkCmdPushConstants(commandBuffer, mesh->getMaterial()->getPipelineLayout(),

@@ -6,7 +6,8 @@
 
 namespace EngineCore
 {
-	EngineRenderer::EngineRenderer(EngineWindow& windowIn, EngineDevice& deviceIn) : window{windowIn}, device{deviceIn}
+	EngineRenderer::EngineRenderer(EngineWindow& windowIn, EngineDevice& deviceIn, EngineRenderSettings& renderSettingsIn)
+							: window{windowIn}, device{deviceIn}, renderSettings{renderSettingsIn}
 	{
 		recreateSwapchain();
 		createCommandBuffers();
@@ -45,16 +46,18 @@ namespace EngineCore
 		}
 		vkDeviceWaitIdle(device.device());
 
-		if (swapchain == nullptr) 
+		if (swapchain == nullptr)
 		{
-			swapchain = std::make_unique<EngineSwapChain>(device, extent);
+			swapchain = std::make_unique<EngineSwapChain>(device, extent, renderSettings.sampleCountMSAA);
 		}
-		else 
+		else
 		{
 			std::shared_ptr<EngineSwapChain> oldSwapChain = std::move(swapchain);
-			swapchain = std::make_unique<EngineSwapChain>(device, extent, oldSwapChain);
-			if (!oldSwapChain->compareSwapFormats(*swapchain.get())) 
-			{ throw std::runtime_error("swap chain image or depth format changed unexpectedly"); }
+			swapchain = std::make_unique<EngineSwapChain>(device, extent, renderSettings.sampleCountMSAA, oldSwapChain);
+			if (!oldSwapChain->compareSwapFormats(*swapchain.get()))
+			{
+				throw std::runtime_error("swap chain image or depth format changed unexpectedly");
+			}
 		}
 	}
 

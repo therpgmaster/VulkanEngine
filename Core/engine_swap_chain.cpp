@@ -11,25 +11,27 @@
 
 namespace EngineCore {
 
-	EngineSwapChain::EngineSwapChain(EngineDevice& deviceRef, VkExtent2D extent)
-		: device{ deviceRef }, windowExtent{ extent } 
+	EngineSwapChain::EngineSwapChain(EngineDevice& deviceRef, VkExtent2D extent, VkSampleCountFlagBits samples)
+						: device{ deviceRef }, windowExtent{ extent }
 	{
-		init();
+		init(samples);
 	}
 
-	EngineSwapChain::EngineSwapChain(EngineDevice& deviceRef, VkExtent2D extent, std::shared_ptr<EngineSwapChain> previous)
-		: device{ deviceRef }, windowExtent{ extent }, oldSwapChain{ previous }
+	EngineSwapChain::EngineSwapChain(EngineDevice& deviceRef, VkExtent2D extent, VkSampleCountFlagBits samples,
+						 std::shared_ptr<EngineSwapChain> previous)
+						: device{ deviceRef }, windowExtent{ extent }, oldSwapChain{ previous }
 	{
-		init();
+		init(samples);
 		oldSwapChain = nullptr;
 	}
 
-	void EngineSwapChain::init() 
+	void EngineSwapChain::init(VkSampleCountFlagBits samples)
 	{
 		createSwapChain();
 		createImageViews();
-		createRenderPass();
-		createDepthResources();
+		createRenderPass(samples);
+		createColorResources(samples); // multisampling
+		createDepthResources(samples);
 		createFramebuffers();
 		createSyncObjects();
 	}
@@ -43,6 +45,13 @@ namespace EngineCore {
 		if (swapChain != nullptr) {
 			vkDestroySwapchainKHR(device.device(), swapChain, nullptr);
 			swapChain = nullptr;
+		}
+
+		for (int i = 0; i < multisampleImages.size(); i++)
+		{
+			vkDestroyImageView(device.device(), multisampleImageViews[i], nullptr);
+			vkDestroyImage(device.device(), multisampleImages[i], nullptr);
+			vkFreeMemory(device.device(), multisampleImageMemorys[i], nullptr);
 		}
 
 		for (int i = 0; i < depthImages.size(); i++) {
@@ -65,22 +74,21 @@ namespace EngineCore {
 		}
 	}
 
-	VkResult EngineSwapChain::acquireNextImage(uint32_t* imageIndex) {
+	VkResult EngineSwapChain::acquireNextImage(uint32_t* imageIndex)
+	{
 		vkWaitForFences(device.device(), 1, &inFlightFences[currentFrame], 
 						VK_TRUE, std::numeric_limits<uint64_t>::max());
 
 		VkResult result = vkAcquireNextImageKHR(device.device(), swapChain, 
 						std::numeric_limits<uint64_t>::max(), imageAvailableSemaphores[currentFrame],  /* must be a non-signaled semaphore */
 						VK_NULL_HANDLE,imageIndex);
-
 		return result;
 	}
 
-	VkResult EngineSwapChain::submitCommandBuffers(
-		const VkCommandBuffer* buffers, uint32_t* imageIndex) {
-		if (imagesInFlight[*imageIndex] != VK_NULL_HANDLE) {
-			vkWaitForFences(device.device(), 1, &imagesInFlight[*imageIndex], VK_TRUE, UINT64_MAX);
-		}
+	VkResult EngineSwapChain::submitCommandBuffers(const VkCommandBuffer* buffers, uint32_t* imageIndex)
+	{
+		if (imagesInFlight[*imageIndex] != VK_NULL_HANDLE) 
+		{ vkWaitForFences(device.device(), 1, &imagesInFlight[*imageIndex], VK_TRUE, UINT64_MAX); }
 		imagesInFlight[*imageIndex] = inFlightFences[currentFrame];
 
 		VkSubmitInfo submitInfo = {};
@@ -100,10 +108,8 @@ namespace EngineCore {
 		submitInfo.pSignalSemaphores = signalSemaphores;
 
 		vkResetFences(device.device(), 1, &inFlightFences[currentFrame]);
-		if (vkQueueSubmit(device.graphicsQueue(), 1, &submitInfo, inFlightFences[currentFrame]) !=
-			VK_SUCCESS) {
-			throw std::runtime_error("failed to submit draw command buffer!");
-		}
+		if (vkQueueSubmit(device.graphicsQueue(), 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS)
+		{ throw std::runtime_error("failed to submit draw command buffer!"); }
 
 		VkPresentInfoKHR presentInfo = {};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -124,7 +130,8 @@ namespace EngineCore {
 		return result;
 	}
 
-	void EngineSwapChain::createSwapChain() {
+	void EngineSwapChain::createSwapChain() 
+	{
 		SwapChainSupportDetails swapChainSupport = device.getSwapChainSupport();
 
 		VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
@@ -133,9 +140,10 @@ namespace EngineCore {
 
 		uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
 		if (swapChainSupport.capabilities.maxImageCount > 0 &&
-			imageCount > swapChainSupport.capabilities.maxImageCount) {
-			imageCount = swapChainSupport.capabilities.maxImageCount;
-		}
+			imageCount > swapChainSupport.capabilities.maxImageCount) 
+		{ imageCount = swapChainSupport.capabilities.maxImageCount; }
+			
+		
 
 		VkSwapchainCreateInfoKHR createInfo = {};
 		createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -151,12 +159,14 @@ namespace EngineCore {
 		QueueFamilyIndices indices = device.findPhysicalQueueFamilies();
 		uint32_t queueFamilyIndices[] = { indices.graphicsFamily, indices.presentFamily };
 
-		if (indices.graphicsFamily != indices.presentFamily) {
+		if (indices.graphicsFamily != indices.presentFamily) 
+		{
 			createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
 			createInfo.queueFamilyIndexCount = 2;
 			createInfo.pQueueFamilyIndices = queueFamilyIndices;
 		}
-		else {
+		else 
+		{
 			createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 			createInfo.queueFamilyIndexCount = 0;      // Optional
 			createInfo.pQueueFamilyIndices = nullptr;  // Optional
@@ -170,9 +180,8 @@ namespace EngineCore {
 
 		createInfo.oldSwapchain = oldSwapChain == nullptr ? VK_NULL_HANDLE : oldSwapChain->swapChain;
 
-		if (vkCreateSwapchainKHR(device.device(), &createInfo, nullptr, &swapChain) != VK_SUCCESS) {
-			throw std::runtime_error("failed to create swap chain!");
-		}
+		if (vkCreateSwapchainKHR(device.device(), &createInfo, nullptr, &swapChain) != VK_SUCCESS) 
+		{ throw std::runtime_error("failed to create swap chain!"); }
 
 		// we only specified a minimum number of images in the swap chain, so the implementation is
 		// allowed to create a swap chain with more. That's why we'll first query the final number of
@@ -186,9 +195,11 @@ namespace EngineCore {
 		swapChainExtent = extent;
 	}
 
-	void EngineSwapChain::createImageViews() {
+	void EngineSwapChain::createImageViews() 
+	{
 		swapChainImageViews.resize(swapChainImages.size());
-		for (size_t i = 0; i < swapChainImages.size(); i++) {
+		for (size_t i = 0; i < swapChainImages.size(); i++) 
+		{
 			VkImageViewCreateInfo viewInfo{};
 			viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 			viewInfo.image = swapChainImages[i];
@@ -200,17 +211,16 @@ namespace EngineCore {
 			viewInfo.subresourceRange.baseArrayLayer = 0;
 			viewInfo.subresourceRange.layerCount = 1;
 
-			if (vkCreateImageView(device.device(), &viewInfo, nullptr, &swapChainImageViews[i]) !=
-				VK_SUCCESS) {
-				throw std::runtime_error("failed to create texture image view!");
-			}
+			if (vkCreateImageView(device.device(), &viewInfo, nullptr, &swapChainImageViews[i]) != VK_SUCCESS)
+			{ throw std::runtime_error("failed to create texture image view!"); }
 		}
 	}
 
-	void EngineSwapChain::createRenderPass() {
+	void EngineSwapChain::createRenderPass(VkSampleCountFlagBits samples)
+	{
 		VkAttachmentDescription depthAttachment{};
 		depthAttachment.format = findDepthFormat();
-		depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+		depthAttachment.samples = samples;
 		depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -224,23 +234,38 @@ namespace EngineCore {
 
 		VkAttachmentDescription colorAttachment = {};
 		colorAttachment.format = getSwapChainImageFormat();
-		colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+		colorAttachment.samples = samples;
 		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 		VkAttachmentReference colorAttachmentRef = {};
 		colorAttachmentRef.attachment = 0;
 		colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		VkAttachmentDescription colorAttachmentResolve{}; // multisample resolve
+		colorAttachmentResolve.format = getSwapChainImageFormat();
+		colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT; // 1
+		colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+		VkAttachmentReference colorAttachmentResolveRef{};
+		colorAttachmentResolveRef.attachment = 2;
+		colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 		VkSubpassDescription subpass = {};
 		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		subpass.colorAttachmentCount = 1;
 		subpass.pColorAttachments = &colorAttachmentRef;
 		subpass.pDepthStencilAttachment = &depthAttachmentRef;
+		subpass.pResolveAttachments = &colorAttachmentResolveRef; // multisample resolve
 
 		VkSubpassDependency dependency = {};
 		dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -253,7 +278,7 @@ namespace EngineCore {
 		dependency.dstAccessMask =
 			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-		std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
+		std::array<VkAttachmentDescription, 3> attachments = { colorAttachment, depthAttachment, colorAttachmentResolve };
 		VkRenderPassCreateInfo renderPassInfo = {};
 		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 		renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
@@ -263,15 +288,16 @@ namespace EngineCore {
 		renderPassInfo.dependencyCount = 1;
 		renderPassInfo.pDependencies = &dependency;
 
-		if (vkCreateRenderPass(device.device(), &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
-			throw std::runtime_error("failed to create render pass!");
-		}
+		if (vkCreateRenderPass(device.device(), &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) 
+		{ throw std::runtime_error("failed to create render pass!"); }
 	}
 
-	void EngineSwapChain::createFramebuffers() {
+	void EngineSwapChain::createFramebuffers() 
+	{
 		swapChainFramebuffers.resize(imageCount());
-		for (size_t i = 0; i < imageCount(); i++) {
-			std::array<VkImageView, 2> attachments = { swapChainImageViews[i], depthImageViews[i] };
+		for (size_t i = 0; i < imageCount(); i++) 
+		{
+			std::array<VkImageView, 3> attachments = { multisampleImageViews[i], depthImageViews[i], swapChainImageViews[i]  };
 
 			VkExtent2D swapChainExtent = getSwapChainExtent();
 			VkFramebufferCreateInfo framebufferInfo = {};
@@ -283,17 +309,13 @@ namespace EngineCore {
 			framebufferInfo.height = swapChainExtent.height;
 			framebufferInfo.layers = 1;
 
-			if (vkCreateFramebuffer(
-				device.device(),
-				&framebufferInfo,
-				nullptr,
-				&swapChainFramebuffers[i]) != VK_SUCCESS) {
-				throw std::runtime_error("failed to create framebuffer!");
-			}
+			if (vkCreateFramebuffer(device.device(), &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS)
+			{ throw std::runtime_error("failed to create framebuffer!"); }
 		}
 	}
 
-	void EngineSwapChain::createDepthResources() {
+	void EngineSwapChain::createDepthResources(VkSampleCountFlagBits samples) 
+	{
 		VkFormat depthFormat = findDepthFormat();
 		swapChainDepthFormat = depthFormat;
 		VkExtent2D swapChainExtent = getSwapChainExtent();
@@ -315,7 +337,7 @@ namespace EngineCore {
 			imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 			imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-			imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+			imageInfo.samples = samples;
 			imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 			imageInfo.flags = 0;
 
@@ -336,13 +358,57 @@ namespace EngineCore {
 			viewInfo.subresourceRange.baseArrayLayer = 0;
 			viewInfo.subresourceRange.layerCount = 1;
 
-			if (vkCreateImageView(device.device(), &viewInfo, nullptr, &depthImageViews[i]) != VK_SUCCESS) {
-				throw std::runtime_error("failed to create texture image view!");
-			}
+			if (vkCreateImageView(device.device(), &viewInfo, nullptr, &depthImageViews[i]) != VK_SUCCESS) 
+			{ throw std::runtime_error("failed to create texture image view!"); }
 		}
 	}
 
-	void EngineSwapChain::createSyncObjects() {
+	void EngineSwapChain::createColorResources(VkSampleCountFlagBits samples)
+	{
+		VkExtent2D swapChainExtent = getSwapChainExtent();
+
+		multisampleImages.resize(imageCount());
+		multisampleImageMemorys.resize(imageCount());
+		multisampleImageViews.resize(imageCount());
+
+		for (int i = 0; i < multisampleImages.size(); i++) {
+			VkImageCreateInfo imageInfo{};
+			imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+			imageInfo.imageType = VK_IMAGE_TYPE_2D;
+			imageInfo.extent.width = swapChainExtent.width;
+			imageInfo.extent.height = swapChainExtent.height;
+			imageInfo.extent.depth = 1;
+			imageInfo.mipLevels = 1;
+			imageInfo.arrayLayers = 1;
+			imageInfo.format = getSwapChainImageFormat();
+			imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+			imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			imageInfo.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+			imageInfo.samples = samples;
+			imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			imageInfo.flags = 0;
+
+			device.createImageWithInfo(imageInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+				multisampleImages[i], multisampleImageMemorys[i]);
+
+			VkImageViewCreateInfo viewInfo{};
+			viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			viewInfo.image = multisampleImages[i];
+			viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			viewInfo.format = getSwapChainImageFormat();
+			viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			viewInfo.subresourceRange.baseMipLevel = 0;
+			viewInfo.subresourceRange.levelCount = 1;
+			viewInfo.subresourceRange.baseArrayLayer = 0;
+			viewInfo.subresourceRange.layerCount = 1;
+
+			if (vkCreateImageView(device.device(), &viewInfo, nullptr, &multisampleImageViews[i]) != VK_SUCCESS)
+			{ throw std::runtime_error("failed to create multisample image view!"); }
+		}
+	}
+
+	void EngineSwapChain::createSyncObjects() 
+	{
 		imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
 		renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
 		inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
@@ -366,11 +432,13 @@ namespace EngineCore {
 		}
 	}
 
-	VkSurfaceFormatKHR EngineSwapChain::chooseSwapSurfaceFormat(
-		const std::vector<VkSurfaceFormatKHR>& availableFormats) {
-		for (const auto& availableFormat : availableFormats) {
+	VkSurfaceFormatKHR EngineSwapChain::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) 
+	{
+		for (const auto& availableFormat : availableFormats) 
+		{
 			if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
-				availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+				availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) 
+			{
 				return availableFormat;
 			}
 		}
@@ -378,8 +446,7 @@ namespace EngineCore {
 		return availableFormats[0];
 	}
 
-	VkPresentModeKHR EngineSwapChain::chooseSwapPresentMode(
-				const std::vector<VkPresentModeKHR>& availablePresentModes) 
+	VkPresentModeKHR EngineSwapChain::chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes)
 	{
 		/*for (const auto& availablePresentMode : availablePresentModes) 
 		{
@@ -403,11 +470,12 @@ namespace EngineCore {
 		return VK_PRESENT_MODE_FIFO_KHR;
 	}
 
-	VkExtent2D EngineSwapChain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
-		if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
-			return capabilities.currentExtent;
-		}
-		else {
+	VkExtent2D EngineSwapChain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) 
+	{
+		if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) 
+		{ return capabilities.currentExtent; }
+		else 
+		{
 			VkExtent2D actualExtent = windowExtent;
 			actualExtent.width = std::max(
 				capabilities.minImageExtent.width,
@@ -420,11 +488,11 @@ namespace EngineCore {
 		}
 	}
 
-	VkFormat EngineSwapChain::findDepthFormat() {
+	VkFormat EngineSwapChain::findDepthFormat() 
+	{
 		return device.findSupportedFormat(
 			{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
-			VK_IMAGE_TILING_OPTIMAL,
-			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+			VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 	}
 
 }  // namespace
