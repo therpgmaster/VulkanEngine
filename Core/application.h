@@ -3,6 +3,7 @@
 #include "Core/engine_window.h"
 #include "Core/GPU/engine_device.h"
 #include "engine_renderer.h"
+#include "Core/GPU/MaterialsManager.h"
 
 // std
 #include <memory>
@@ -10,7 +11,7 @@
 #include <chrono> // timing
 #include <algorithm> // min()
 
-#include "ECS/StaticMesh.h"
+#include "Core/ECS/Primitive.h"
 #include "ECS/Actor.h"
 #include "Types/CommonTypes.h"
 #include "Core/GPU/Memory/descriptors.h"
@@ -74,6 +75,17 @@ namespace EngineCore
 		// begins the main window event loop
 		void startExecution();
 
+		
+
+		// TODO: move this function somewhere else
+		// also remove temporaries, search for "FakeScaleTest082"
+		//void simulateDistanceByScale(const StaticMesh& mesh, const Transform& cameraTransform);
+		Transform simDistOffsets{};
+		//static double ddist(const Vector3D<double>& a, const Vector3D<double>& b);
+		//static Vector3D<double> ddir(const Vector3D<double>& a, const Vector3D<double>& b);
+
+		void applyWorldOriginOffset(Transform& cameraTransform);
+
 	private:
 		void loadActors();
 		void setupDefaultInputs();
@@ -84,13 +96,17 @@ namespace EngineCore
 		EngineDevice device{ window };
 		// the renderer manages the swapchain and the vulkan command buffers
 		EngineRenderer renderer{ window, device, renderSettings };
+		// the primary materials manager (contains the master material objects)
+		MaterialsManager materialsMgr{ renderer, renderSettings, device };
 
 		EngineClock engineClock{};
 
-		GlobalDescriptorSetManager globalDSetMgr{ device, EngineSwapChain::MAX_FRAMES_IN_FLIGHT };
+		//GlobalDescriptorSetManager globalDSetMgr{ device, EngineSwapChain::MAX_FRAMES_IN_FLIGHT };
+
+		DescriptorSet dset{ device, EngineSwapChain::MAX_FRAMES_IN_FLIGHT };
 
 		std::unique_ptr<DescriptorPool> globalDescriptorPool{};
-		std::vector<StaticMesh*> loadedMeshes;
+		std::vector<ECS::Primitive*> loadedMeshes;
 
 	};
 

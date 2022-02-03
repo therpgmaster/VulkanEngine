@@ -1,37 +1,37 @@
 #pragma once
-
-#include "Core/ECS/GenericDataObject.h"
 #include "Core/Types/CommonTypes.h"
 
 #include <glm/glm.hpp>
 
-class Actor;
-
-class ActorComponent : public GenericDataObject
+namespace ECS 
 {
-	Actor* parentActor = nullptr;
+	class Actor; // forward-declaration
 
-public:
-	ActorComponent() {};
-	~ActorComponent();
+	/* base class for components */
+	class ActorComponent
+	{
+		friend class Actor; // allow actor (parent) full access
+	public:
+		ActorComponent() {};
+		~ActorComponent();
+	
+		ActorComponent& operator=(const ActorComponent&) = default;
+		ActorComponent& operator=(ActorComponent&&) = default;
+		bool operator==(const ActorComponent& comparePtr) const { return &comparePtr == this; }
+	
+		
+		Actor* getParentActor() { return parentActor; }
+	
+		Transform transform{}; // location/rotation/scale relative to parent
+	
+		virtual void tick(const float& deltaTime) {};
 
-	ActorComponent& operator=(const ActorComponent&) = default;
-	ActorComponent& operator=(ActorComponent&&) = default;
-	bool operator==(ActorComponent* comparePtr) const { return comparePtr == this; }
+	private:
+		Actor* parentActor = nullptr; // set by parent on registration
+		bool canTick = true; // if true, parent actor will attempt to call user-defined tick logic
+		
 
-	/* should be called once for every component, using Actor::registerComponent() */
-	void setParentActor(Actor& parent);
+	};
+} // namespace
 
-	Actor* getParentActor() { return parentActor; }
 
-	/* used by parent actor to check if this component has user defined logic to run on tick */
-	bool getComponentCanTick() const { return canTick; }
-
-	Transform transform{};
-
-	virtual void tick(const float& deltaTime) {};
-
-protected:
-	/* if false, parent actor will not attempt to call user defined tick functions on this component */
-	bool canTick = true;
-};

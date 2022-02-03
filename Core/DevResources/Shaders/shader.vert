@@ -8,25 +8,29 @@ layout(location = 3) in vec2 uv;
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec3 fragPositionWS;
 layout(location = 2) out vec3 fragNormalWS;
+layout(location = 3) out vec2 fragUV;
 
-layout(set = 0, binding = 0) uniform GlobalFrameDataBuffer 
+layout(std140, set = 0, binding = 0) uniform UBO1 
 {
 	mat4 projectionViewMatrix;
-	vec4 ambientLightColor;
-	vec3 lightPosition;
-	vec4 lightColor;
-} globalFrameData;
+} ubo1;
+
+layout(std140, set = 0, binding = 1) uniform UBO2 
+{
+	vec3 hue;
+} ubo2;
 
 layout(push_constant) uniform Push	
 {
 	mat4 transform;
 	mat4 normalMatrix;
 } push;
-
+//globalFrameData.projectionViewMatrix
 void main() 
 {
-  gl_Position = globalFrameData.projectionViewMatrix * push.transform * position;
+  gl_Position = ubo1.projectionViewMatrix * push.transform * position;
   fragNormalWS = normalize(mat3(push.normalMatrix) * normal);
   fragPositionWS = vec4(push.transform * position).xyz;
   fragColor = vec3(0.8, 0.6, 0.6); // use fixed value instead of vertex color
+  fragUV = uv;
 }

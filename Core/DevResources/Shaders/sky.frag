@@ -5,6 +5,7 @@ layout(location = 1) in vec3 fragPositionWS;
 layout(location = 2) in vec3 fragNormalWS;
 
 layout (location = 0) out vec4 outColor;
+layout (depth_any) out float gl_FragDepth;
 
 layout(set = 0, binding = 0) uniform GlobalFrameDataBuffer 
 {
@@ -22,7 +23,7 @@ layout(push_constant) uniform Push
 
 void main() 
 {
-	gl_FragDepth = 0.7;
+	gl_FragDepth = 1.0;
 	//outColor = vec4(fragPositionWS, 1.0);
 	outColor = vec4(0.006, 0.006, 0.006, 0.75);
 }

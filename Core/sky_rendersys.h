@@ -1,5 +1,6 @@
 #pragma once
-#include "Core/ECS/StaticMesh.h"
+#include "Core/ECS/Primitive.h"
+#include "Core/GPU/MaterialsManager.h"
 #include <memory>
 #include <string>
 #include <glm/glm.hpp>
@@ -9,15 +10,14 @@ namespace EngineCore
 	class SkyRenderSystem 
 	{
 	public:
-		SkyRenderSystem(std::string skyMeshPath, MaterialCreateInfo skyMatInfo, EngineDevice& deviceIn);
+		SkyRenderSystem(MaterialsManager& mgr, std::vector<VkDescriptorSetLayout>& setLayouts,
+						EngineDevice& device);
 
 		void renderSky(VkCommandBuffer commandBuffer, VkDescriptorSet sceneGlobalDescriptorSet, 
 						const glm::vec3& observerPosition);
 
 	private:
-		EngineDevice& device;
-		VkRenderPass renderPass;
-		std::unique_ptr<StaticMesh> skyMesh;
+		std::unique_ptr<ECS::Primitive> skyMesh;
 	};
 
 } // namespace

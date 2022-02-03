@@ -11,7 +11,7 @@
 #include <cmath> // only used in perspective calculation
 
 class Camera;
-#include "ECS/StaticMesh.h"
+#include "Core/ECS/Primitive.h"
 
 namespace EngineCore
 {
@@ -24,9 +24,8 @@ namespace EngineCore
 		MeshRenderSystem(const MeshRenderSystem&) = delete;
 		MeshRenderSystem& operator=(const MeshRenderSystem&) = delete;
 
-		void renderMeshes(VkCommandBuffer commandBuffer, std::vector<StaticMesh*>& meshes,
-						const float& deltaTimeSeconds, float time, VkDescriptorSet sceneGlobalDescriptorSet);
-							
+		void renderMeshes(VkCommandBuffer commandBuffer, std::vector<ECS::Primitive*>& meshes,
+						const float& deltaTimeSeconds, float time, VkDescriptorSet sceneGlobalDescriptorSet, Transform& fakeScaleOffsets); //FakeScaleTest082
 
 	private:
 		EngineDevice& device;

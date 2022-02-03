@@ -80,7 +80,7 @@ namespace EngineCore
 			VkImage& image,
 			VkDeviceMemory& imageMemory);
 		// imports and initializes an image texture from disk
-		void importImageFromFile(const char* path);
+		//void importImageFromFile(const char* path);
 		// takes a VkImage and transitions its layout
 		void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
 

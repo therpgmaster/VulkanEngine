@@ -5,10 +5,6 @@
 #include <set>
 #include <unordered_set>
 
-// image importer, can only be defined in one (source) file
-#define STB_IMAGE_IMPLEMENTATION
-#include "ThirdParty/stb_image.h"
-
 namespace EngineCore 
 {
 	// local callback functions
@@ -555,7 +551,7 @@ namespace EngineCore
 		{ throw std::runtime_error("failed to bind image memory!"); }
 	}
 
-	void EngineDevice::importImageFromFile(const char* path)
+	/*void EngineDevice::importImageFromFile(const char* path)
 	{
 		// based on Vulkan Tutorial - Texture mapping
 		path = "DevResources/Textures/texture.png"; // TODO: remove hardcoded path
@@ -601,9 +597,9 @@ namespace EngineCore
 		// prepare for shader access
 		transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		// destroy the temporary buffer
-		vkDestroyBuffer(device(), stagingBuffer, nullptr);
+		vkDestroyBuffer(device(),stagingBuffer, nullptr);
 		vkFreeMemory(device(), stagingBufferMemory, nullptr);
-	}
+	}*/
 
 	void EngineDevice::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
 		VkCommandBuffer commandBuffer = beginSingleTimeCommands();

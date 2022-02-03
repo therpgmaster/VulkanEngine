@@ -3,17 +3,24 @@
 
 namespace EngineCore
 {
-	SkyRenderSystem::SkyRenderSystem(std::string skyMeshPath, MaterialCreateInfo skyMatInfo, EngineDevice& deviceIn) 
-									: device{ deviceIn }
+	SkyRenderSystem::SkyRenderSystem(MaterialsManager& mgr, std::vector<VkDescriptorSetLayout>& setLayouts,
+									EngineDevice& device)
 	{
+		// TODO: hardcoded paths
+		const std::string meshPath = "G:/VulkanDev/VulkanEngine/Core/DevResources/Meshes/skysphere.obj";
+		ShaderFilePaths skyShaders("G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/sky.vert.spv",
+									"G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/sky.frag.spv");
 		// prepare sky mesh
-		StaticMesh::MeshBuilder builder{};
-		builder.loadFromFile(skyMeshPath);
-		skyMesh = std::make_unique<StaticMesh>(device, builder);
+		ECS::Primitive::MeshBuilder builder{};
+		builder.loadFromFile(meshPath);
+		skyMesh = std::make_unique<ECS::Primitive>(device, builder);
 
+		// create unique material for sky
+		MaterialCreateInfo matInfo(skyShaders, setLayouts);
 		// set the sky material to render backfaces, since it will be viewed from inside
-		skyMatInfo.shadingProperties.cullModeFlags = VK_CULL_MODE_NONE;
-		skyMesh.get()->setMaterial(skyMatInfo); // load sky shaders
+		matInfo.shadingProperties.cullModeFlags = VK_CULL_MODE_NONE;
+		auto m = mgr.createMaterial(matInfo); // create
+		skyMesh.get()->setMaterial(m); // use
 	}
 
 	void SkyRenderSystem::renderSky(VkCommandBuffer commandBuffer, VkDescriptorSet sceneGlobalDescriptorSet, 

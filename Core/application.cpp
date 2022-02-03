@@ -31,29 +31,46 @@ namespace EngineCore
 		MeshRenderSystem meshRenderSys{ device, renderer.getSwapchainRenderPass() };
 
 		// global descriptor set layout
-		std::vector<VkDescriptorSetLayout> setLayout =
-		{ globalDSetMgr.sceneGlobalSetLayout.get()->getDescriptorSetLayout() };
+		//std::vector<VkDescriptorSetLayout> setLayout =
+		//{ globalDSetMgr.layout.get()->getDescriptorSetLayout() };
 
-		// prepare for sky rendering TODO: move this somewhere else
-		ShaderFilePaths skyShaders("G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/sky.vert.spv",
-								"G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/sky.frag.spv");
-		MaterialCreateInfo skyMatInfo(renderer.getSwapchainRenderPass(), skyShaders, setLayout, renderSettings);
+		// runtime descriptors test
+		UBOCreateInfo ubo1{ device };
+		ubo1.addMember(UBOCreateInfo::MemberType::mat4);
+		UBOCreateInfo ubo2{ device };
+		ubo2.addMember(UBOCreateInfo::MemberType::vec3);
 
-		SkyRenderSystem skyRenderSys{ "G:/VulkanDev/VulkanEngine/Core/DevResources/Meshes/skysphere.obj", skyMatInfo, device };
+		dset.addUBO(ubo1);
+		dset.addUBO(ubo2);
+		dset.finalize();
+
+		std::vector<VkDescriptorSetLayout> dsetLayout = { dset.getLayout() };
+		
+		// prepare for sky rendering
+		//SkyRenderSystem skyRenderSys{ materialsMgr, dsetLayout, device };
 		
 		// TODO: this is a temporary single-camera setup
 		Camera camera{ 45.f, 0.8f, 10.f };
+		camera.transform.translation.x = -8.f;
 		
 		// input setup
 		window.input.captureMouseCursor(true);
 		setupDefaultInputs();
 
-		// TODO: hardcoded paths - create test material
-		ShaderFilePaths shaders("G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader.vert.spv",
+		// TODO: hardcoded paths - create test materials
+		ShaderFilePaths shader("G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader.vert.spv",
 			"G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader.frag.spv");
-		MaterialCreateInfo matInfo(renderer.getSwapchainRenderPass(), shaders, setLayout, renderSettings);
+		//ShaderFilePaths shader2("G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader.vert.spv",
+			//"G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shaderDifferentColor.frag.spv");
 
-		if (loadedMeshes.size() > 0 && loadedMeshes[0]) { for (auto* m : loadedMeshes) { m->setMaterial(matInfo); } }
+		auto mat1 = materialsMgr.createMaterial(MaterialCreateInfo(shader, dsetLayout));
+		//auto mat2 = materialsMgr.createMaterial(MaterialCreateInfo(shader2, setLayout));
+
+		if (loadedMeshes.size() > 0 && loadedMeshes[0]) { for (auto* m : loadedMeshes) 
+		{ 
+			//if (m->useFakeScale) { m->setMaterial(mat2); continue; } //FakeScaleTest082
+			m->setMaterial(mat1); }
+		}
 		else { throw std::runtime_error("could not access loaded mesh"); }
 
 		// create gui container (EXPERIMENTAL)
@@ -69,16 +86,26 @@ namespace EngineCore
 			// render frame
 			if (auto commandBuffer = renderer.beginFrame()) 
 			{
-				int frameIndex = renderer.getFrameIndex();
+				const uint32_t frameIndex = renderer.getFrameIndex(); // current framebuffer index
 				engineClock.measureFrameDelta(frameIndex);
 
 				// update scene global descriptors
-				SceneGlobalDataBuffer bufferData{};
+				/*SceneGlobalDataBuffer bufferData{};
 				bufferData.projectionViewMatrix = camera.getProjectionMatrix()
 					* Camera::getWorldBasisMatrix() * camera.getViewMatrix(true);
-				globalDSetMgr.writeToSceneGlobalBuffer(frameIndex, bufferData, true);
+				globalDSetMgr.writeToSceneGlobalBuffer(frameIndex, bufferData, true);*/
 
-				//imguiObj.newFrame(); // imgui
+				glm::mat4 pvm{ 1.f };
+				pvm = camera.getProjectionMatrix() * Camera::getWorldBasisMatrix() * camera.getViewMatrix(true);
+				dset.writeUBOMember(0, pvm, 0, frameIndex);
+
+				glm::vec3 rgb{ 0.1f, 0.08f, 0.7f };
+				dset.writeUBOMember(1, rgb, 0, frameIndex);
+				
+
+				applyWorldOriginOffset(camera.transform); //(TODO: ) experimental
+
+				imguiObj.newFrame(); // imgui
 
 				renderer.beginSwapchainRenderPass(commandBuffer);
 
@@ -87,12 +114,15 @@ namespace EngineCore
 				//ImGui::Button("Save");
 				
 				// render sky sphere
-				skyRenderSys.renderSky(commandBuffer, globalDSetMgr.sceneGlobalSets[frameIndex], camera.transform.translation);
+				//skyRenderSys.renderSky(commandBuffer, globalDSetMgr.sets[frameIndex], camera.transform.translation);
+
+				//simulateDistanceByScale(*loadedMeshes[1], camera.transform); //FakeScaleTest082
+
 				// render meshes
 				meshRenderSys.renderMeshes(commandBuffer, loadedMeshes, engineClock.getDelta(), engineClock.getElapsed(),
-											globalDSetMgr.sceneGlobalSets[frameIndex]);
+											dset.getDescriptorSet(frameIndex), simDistOffsets); //FakeScaleTest082
 				
-				//imguiObj.render(commandBuffer); // imgui
+				imguiObj.render(commandBuffer); // imgui
 
 				// camera movement
 				auto lookInput = window.input.getMouseDelta();
@@ -112,14 +142,26 @@ namespace EngineCore
 
 	void EngineApplication::loadActors() 
 	{
-		
-		StaticMesh::MeshBuilder builder{};
-		builder.loadFromFile("G:/VulkanDev/VulkanEngine/Core/DevResources/Meshes/6star.obj"); // TODO: hardcoded paths
+		using namespace ECS;
 
-		for (uint32_t i = 0; i < 600; i++) 
+		Primitive::MeshBuilder builder{};
+		builder.loadFromFile("G:/VulkanDev/VulkanEngine/Core/DevResources/Meshes/uv_test_cube.obj"); // TODO: hardcoded paths
+		loadedMeshes.push_back(new Primitive(device, builder));
+		loadedMeshes[0]->getTransform().translation = Vec{7.f, 0.f, 0.f};
+		loadedMeshes[0]->getTransform().scale = 5.f;
+
+		/*builder.loadFromFile("G:/VulkanDev/VulkanEngine/Core/DevResources/Meshes/sphere.obj");
+		loadedMeshes.push_back(new Primitive(device, builder)); 
+		loadedMeshes[1]->useFakeScale = true;//FakeScaleTest082 testing on mesh at index 1
+		loadedMeshes[1]->getTransform().translation.x = 0.f;
+		loadedMeshes[1]->getTransform().scale = 1.f;*/
+
+		return; // TODO: function terminates here!
+		for (uint32_t i = 0; i < 1; i++) 
 		{ 
-			loadedMeshes.push_back(new StaticMesh(device, builder));
-			loadedMeshes[i]->transform.translation.x = 0.5f * i;
+			loadedMeshes.push_back(new Primitive(device, builder));
+			loadedMeshes[i]->getTransform().translation.x = 0.5f * i;
+			if (i == 1) { loadedMeshes[i]->useFakeScale = true; } 
 		}
 
 	}
@@ -139,6 +181,78 @@ namespace EngineCore
 		// up/down
 		uint32_t upAxisIndex = inputSys.addBinding(KeyBinding(GLFW_KEY_R, 1.f), "kbUpAxis");
 		inputSys.addBinding(KeyBinding(GLFW_KEY_F, -1.f), upAxisIndex);
+	}
+	/*
+	void EngineApplication::simulateDistanceByScale(const StaticMesh& mesh, const Transform& cameraTransform)
+	{
+		// old, regular-precision version
+		//const auto actualScale = mesh.transform.scale.x; // uniform scale required! (for now)
+		//const auto actualLoc = mesh.transform.translation;
+		//const auto camLoc = cameraTransform.translation;
+		//
+		//const float max = 2.f;
+		//const auto dst = Vec::distance(actualLoc, camLoc); std::cout << "\n" << dst;
+		//
+		//
+		//auto dir = Vec::direction(camLoc, actualLoc);
+		//const auto offset = dst - max; // offset between actual location and render location, along direction
+		//const auto scale = max / dst; // fake scale, decided by observer distance
+		//
+		//simDistOffsets.translation = actualLoc + (dir * -offset);
+		//simDistOffsets.scale = actualScale * scale;
+
+		const float actualScale_f = 696340 * 2000;
+		const float actualLoc_f = 2000000 * 1000;
+
+		double actualScale = (double)actualScale_f;
+		auto actualLoc = Vector3D<double>{ (double)actualLoc_f, 0.0, 0.0 };
+		const auto camLoc = Vector3D<double>{ cameraTransform.translation.x, cameraTransform.translation.y, cameraTransform.translation.z };
+
+		const double max = 8.0;
+		const double dst = ddist(actualLoc, camLoc);
+		const auto dir = ddir(camLoc, actualLoc);
+		const auto offset = dst - max;
+		const auto scale = max / dst;
+
+		const Vector3D<double> t = actualLoc + (dir * -offset);
+		const double s = actualScale * scale;
+
+		simDistOffsets.translation = { (float)t.x, (float)t.y, (float)t.z };
+		simDistOffsets.scale = (float)s;
+	}
+
+	double EngineApplication::ddist(const Vector3D<double>& a, const Vector3D<double>& b)
+	{
+		const double dsq = pow(b.x - a.x, 2) + pow(b.y - a.y, 2) + pow(b.z - a.z, 2);
+		return sqrt(dsq);
+	}
+
+	Vector3D<double> EngineApplication::ddir(const Vector3D<double>& a, const Vector3D<double>& b) 
+	{
+		Vector3D<double> k = b - a; // direction
+		// normalization to unit
+		const auto sum = (k.x * k.x) + (k.y * k.y) + (k.z * k.z);
+		const auto f = 1.0 / sqrt(sum);
+		return { k.x * f, k.y * f, k.z * f };
+	}
+		*/
+	void EngineApplication::applyWorldOriginOffset(Transform& cameraTransform)
+	{
+		const auto threshold = 250000.f;
+		auto& tft = cameraTransform.translation;
+
+		const auto x = std::max(std::max(abs(tft.x), abs(tft.y)), abs(tft.z));
+		if (x < threshold) { return; }
+
+		const auto nw = cameraTransform.translation;
+
+		std::cout << "\n\n\n\n\n rebasing world origin to x:" << nw.x << " y:" << nw.y << " z:" << nw.z;
+
+		cameraTransform.translation = {0.f,0.f,0.f};
+		if (loadedMeshes.size() > 0) 
+		{
+			for (auto* m : loadedMeshes) { m->getTransform().translation = m->getTransform().translation - nw; }
+		}
 	}
 
 } // namespace

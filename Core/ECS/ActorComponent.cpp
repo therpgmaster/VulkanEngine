@@ -1,19 +1,12 @@
 #include "ActorComponent.h"
-#include "Actor.h"
+#include "Core/ECS/Actor.h"
 #include <cassert>
 
-
-ActorComponent::~ActorComponent() 
+namespace ECS 
 {
-	if (parentActor)
+	ActorComponent::~ActorComponent() 
 	{
-		// when this component is destroyed, we must report it to the parent actor
-		parentActor->componentPendingDeletion(this);
+		if (parentActor) { parentActor->componentDeletionSelfReport(this); }
 	}
-}
 
-void ActorComponent::setParentActor(Actor& parent) 
-{
-	assert(!parentActor && "cannot set parent actor, component already has a parent");
-	if (!parentActor) { parentActor = &parent; }
-}
+} // namespace

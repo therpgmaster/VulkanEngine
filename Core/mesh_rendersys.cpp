@@ -15,8 +15,8 @@
 
 namespace EngineCore
 {
-	void MeshRenderSystem::renderMeshes(VkCommandBuffer commandBuffer, std::vector<StaticMesh*>& meshes,
-			const float& deltaTimeSeconds, float time, VkDescriptorSet sceneGlobalDescriptorSet)
+	void MeshRenderSystem::renderMeshes(VkCommandBuffer commandBuffer, std::vector<ECS::Primitive*>& meshes,
+			const float& deltaTimeSeconds, float time, VkDescriptorSet sceneGlobalDescriptorSet, Transform& fakeScaleOffsets) //FakeScaleTest082
 			
 	{
 		for (auto* pMesh : meshes)
@@ -32,7 +32,7 @@ namespace EngineCore
 
 			// spin 3D primitive - demo
 			float spinRate = 0.0f;//0.8f;
-			mesh.transform.rotation.z = glm::mod(mesh.transform.rotation.z + (spinRate * deltaTimeSeconds), glm::two_pi<float>());
+			mesh.getTransform().rotation.z = glm::mod(mesh.getTransform().rotation.z + spinRate * deltaTimeSeconds, glm::two_pi<float>());
 
 			/*if (camera != nullptr)
 			{
@@ -69,9 +69,20 @@ namespace EngineCore
 				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 				0, sizeof(SimplePushConstantData), &push);*/
 
-			Material::MeshPushConstants push{};
-			push.transform = mesh.transform.mat4();
-			material.writePushConstantsForMesh(commandBuffer, push);
+			//FakeScaleTest082
+			if (mesh.useFakeScale) 
+			{
+				Material::MeshPushConstants push{};
+				push.transform = fakeScaleOffsets.mat4(); //t
+				material.writePushConstantsForMesh(commandBuffer, push);
+			} 
+			else 
+			{
+				// NON-TEST CODE!
+				Material::MeshPushConstants push{};
+				push.transform = mesh.getTransform().mat4();
+				material.writePushConstantsForMesh(commandBuffer, push);
+			}
 
 			// record mesh draw command
 			mesh.bind(commandBuffer);

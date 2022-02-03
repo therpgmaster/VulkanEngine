@@ -201,7 +201,7 @@ public:
 	void moveInPlaneXY(const Vector2D<double>& lookInput, const float& moveFwd, const float& moveRight, const float& moveUp, const float& deltaTime)
 	{
 		float lookSpeed = 6.8f;
-		float moveSpeed = 1.f;
+		float moveSpeed = 12.f;
 
 		float yawInput = lookInput.x != 0 ? lookInput.x / abs(lookInput.x) : 0.f; 
 		float pitchInput = lookInput.y != 0 ? lookInput.y / abs(lookInput.y) : 0.f;

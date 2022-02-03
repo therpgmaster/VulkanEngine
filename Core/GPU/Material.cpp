@@ -1,5 +1,6 @@
 #include "Core/GPU/Material.h"
-#include "Core/ECS/StaticMesh.h"
+#include "Core/ECS/Primitive.h"
+#include "MaterialsManager.h"
 
 #include <fstream>
 #include <iostream>
@@ -11,10 +12,15 @@
 
 namespace EngineCore 
 {
-	Material::Material(const MaterialCreateInfo& matInfo, EngineDevice& deviceIn)
-						: device{ deviceIn }, materialCreateInfo{ matInfo }
+	Material::Material(const MaterialCreateInfo& matInfo, const EngineRenderSettings& rs,
+					VkRenderPass pass, EngineDevice& deviceIn)
+					: materialCreateInfo{ matInfo }, engineRenderSettings{ rs }, 
+					renderPass{ pass }, device{ deviceIn }
 	{
-		if (materialCreateInfo.descriptorSetLayouts.empty()) { throw std::runtime_error("material error, no descriptor set layouts specified"); }
+		if (materialCreateInfo.descriptorSetLayouts.empty()) 
+		{ throw std::runtime_error("material error, no descriptor set layouts specified"); }
+		if (renderPass == VK_NULL_HANDLE)
+		{ throw std::runtime_error("material error, material must be assigned a valid renderpass"); }
 		createPipelineLayout();
 		createPipeline();
 	}
@@ -161,7 +167,9 @@ namespace EngineCore
 
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(materialCreateInfo.descriptorSetLayouts.size());
+		const uint32_t setLayoutCount = static_cast<uint32_t>(materialCreateInfo.descriptorSetLayouts.size());
+		assert(setLayoutCount < 5 && "some GPUs may only support 4 (max) descriptor sets per pipeline");
+		pipelineLayoutInfo.setLayoutCount = setLayoutCount;
 		pipelineLayoutInfo.pSetLayouts = materialCreateInfo.descriptorSetLayouts.data();
 		pipelineLayoutInfo.pushConstantRangeCount = 1;
 		pipelineLayoutInfo.pPushConstantRanges = &pushConstRange;
@@ -178,11 +186,11 @@ namespace EngineCore
 		getDefaultPipelineConfig(cfg);
 		// modify config with material shading properties
 		applyMatPropsToPipelineConfig(matInfo.shadingProperties, cfg);
-		cfg.renderPass = matInfo.renderPass;
+		cfg.renderPass = renderPass;
 		cfg.pipelineLayout = pipelineLayout;
 		
 		// set pipeline's multisample count (MSAA samples per pixel) to the current engine-global setting
-		cfg.multisampleInfo.rasterizationSamples = matInfo.engineRenderSettings.sampleCountMSAA;
+		cfg.multisampleInfo.rasterizationSamples = engineRenderSettings.sampleCountMSAA;
 
 		assert(cfg.pipelineLayout != VK_NULL_HANDLE && "pipeline creation error, null pipelineLayout");
 		assert(cfg.renderPass != VK_NULL_HANDLE && "pipeline creation error, null renderPass");
@@ -208,8 +216,8 @@ namespace EngineCore
 		shaderStages[1].pNext = nullptr;
 		shaderStages[1].pSpecializationInfo = nullptr;
 
-		auto bindingDescriptions = StaticMesh::Vertex::getBindingDescriptions();
-		auto attributeDescriptions = StaticMesh::Vertex::getAttributeDescriptions();
+		auto bindingDescriptions = ECS::Primitive::Vertex::getBindingDescriptions();
+		auto attributeDescriptions = ECS::Primitive::Vertex::getAttributeDescriptions();
 		VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 		vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 		vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
@@ -248,6 +256,14 @@ namespace EngineCore
 		vkCmdPushConstants(commandBuffer, pipelineLayout,
 			VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 			0, sizeof(MeshPushConstants), (void*) &data);
+	}
+
+	void MaterialHandle::matUserAdd(const bool& remove) const
+	{
+		if (!materialPtr) { return; } // does nothing if the handle is null
+		assert(mgr && "cannot add or remove users on unmanaged MaterialHandle");
+		if (remove) { mgr->matReportUserAddOrRemove(*this, -1); }
+		else { mgr->matReportUserAddOrRemove(*this, 1); }
 	}
 
 } // namespace

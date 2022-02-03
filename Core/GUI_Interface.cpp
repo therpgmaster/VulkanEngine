@@ -2,6 +2,7 @@
 
 #include <array>
 #include <stdexcept>
+#include <fstream>
 
 namespace EngineCore
 {
@@ -314,5 +315,20 @@ namespace EngineCore
 		renderPass.descriptor.sampler = renderPass.sampler;
 	};
 
+	void Imgui::loadFont(const std::string& path) 
+	{
+		// read file
+		std::ifstream file{ path, std::ios::ate | std::ios::binary };
+		if (!file.is_open()) { throw std::runtime_error("could not read font file " + path); }
+		size_t fileSize = static_cast<size_t>(file.tellg());
+		std::vector<char> fileData(fileSize);
+		file.seekg(0);
+		file.read(fileData.data(), fileSize);
+		file.close();
+		void* data = reinterpret_cast<void*>(fileData.data()); // correct?
+
+
+
+	}
 	
 } // namespace

@@ -1,8 +1,10 @@
 #include "Core/GPU/Memory/Descriptors.h"
+#include "Core/Types/Math.h"
 
 // std
 #include <cassert>
 #include <stdexcept>
+#include <iostream>
 
 namespace EngineCore
 {
@@ -200,11 +202,10 @@ namespace EngineCore
 		vkUpdateDescriptorSets(pool.device.device(), writes.size(), writes.data(), 0, nullptr);
 	}
 
-	// *************** Global descriptor set manager *********************
-
+	/*
 	GlobalDescriptorSetManager::GlobalDescriptorSetManager(EngineDevice& device, const uint32_t& maxFramesInFlight)
 	{
-		sceneGlobalSets.resize(maxFramesInFlight);
+		sets.resize(maxFramesInFlight);
 
 		globalDescriptorPool = DescriptorPool::Builder(device)
 			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, maxFramesInFlight)
@@ -212,28 +213,140 @@ namespace EngineCore
 		// one buffer for each frame in flight
 		for (uint32_t i = 0; i < maxFramesInFlight; i++)
 		{
-			sceneGlobalBuffers.push_back(std::make_unique<GBuffer>(device, sizeof(SceneGlobalDataBuffer), 1,
+			buffers.push_back(std::make_unique<GBuffer>(device, sizeof(SceneGlobalDataBuffer), 1,
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT));
-			sceneGlobalBuffers[i]->map();
+			buffers[i]->map();
 		}
-		// the scene global descriptor set will hold data visible to all shaders in the scene
-		sceneGlobalSetLayout = DescriptorSetLayout::Builder(device)
+		// add uniform buffer to layout
+		layout = DescriptorSetLayout::Builder(device)
 			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS)
 			.build();
 
 		for (uint32_t i = 0; i < maxFramesInFlight; i++)
 		{
-			auto bufferInfo = sceneGlobalBuffers[i]->descriptorInfo();
-			DescriptorWriter(*sceneGlobalSetLayout.get(), *globalDescriptorPool)
+			auto bufferInfo = buffers[i]->descriptorInfo();
+			DescriptorWriter(*layout.get(), *globalDescriptorPool)
 				.writeBuffer(0, &bufferInfo)
-				.build(sceneGlobalSets[i]);
+				.build(sets[i]);
 		}
 	}
 
 	void GlobalDescriptorSetManager::writeToSceneGlobalBuffer(const uint32_t& frameIndex, SceneGlobalDataBuffer& data, const bool& flush)
 	{
-		sceneGlobalBuffers[frameIndex]->writeToBuffer((void*)&data);
-		if (flush) { sceneGlobalBuffers[frameIndex]->flush(); }
+		buffers[frameIndex]->writeToBuffer((void*)&data);
+		if (flush) { buffers[frameIndex]->flush(); }
+	}*/
+
+	// *************** Uniform Buffer wrapper *********************
+
+	UBO::UBO(const UBOCreateInfo& createInfo, const uint32_t& numBuffers)
+	{
+		addMembers(createInfo.memberTypes);
+		createBuffers(createInfo.device, numBuffers);
 	}
+
+	void UBO::writeMember(const uint32_t& i, void* data, const size_t& dataSize,
+								const uint32_t& bufferIndex, const bool& flush)
+	{
+		assert(i < members.size() && "invalid member index, could not write to uniform buffer");
+		auto& m = members[i];
+		if (m.size != size) { throw std::runtime_error("incompatible type size, could not write to uniform buffer"); }
+
+		getBuffer(bufferIndex)->writeToBuffer(data, dataSize, m.offset);
+		if (flush) { getBuffer(bufferIndex)->flush(); }
+	}
+
+	void UBO::addMembers(const std::vector<MT>& memberTypes)
+	{
+		for (auto& t : memberTypes)
+		{
+			if (t == MT::none) { throw std::runtime_error("cannot add member to ubo, unspecified type"); }
+			// vulkan alignment requirements for data used in uniform buffer descriptors
+			auto m = getMemberTypeInfo(t);
+			assert(m.size > 0 && "cannot add member to ubo, unknown size");
+			// find suitable offset (location) for the data member, at its required alignment
+			m.offset = Math::roundUpToClosestMultiple(size, m.alignment);
+			members.push_back(m);
+			size = m.offset + m.size; // increase total size of buffer
+		}
+	}
+
+	UBO::MemberInfo UBO::getMemberTypeInfo(const MT& t)
+	{
+		// vulkan imposes alignment requirements for data used in uniform buffer descriptors
+		MemberInfo m{ 0, 0 };
+		if (t == MT::scalar) { m = MemberInfo(4, 4); } // 1 * scalar
+		else if (t == MT::vec2) { m = MemberInfo(8, 8); } // 2 * scalar
+		else if (t == MT::vec3) { m = MemberInfo(16, 12); } // 4 * scalar
+		else if (t == MT::vec4) { m = MemberInfo(16, 16); } // 4 * scalar
+		else if (t == MT::mat4) { m = MemberInfo(16, 64); } // 4 * scalar
+		return m;
+	}
+
+	void UBO::createBuffers(EngineDevice& device, const uint32_t& numBuffers)
+	{
+		auto minOffsetAlignment = device.properties.limits.minUniformBufferOffsetAlignment;
+		for (uint32_t i = 0; i < numBuffers; i++) 
+		{
+			buffers.push_back(std::make_unique<GBuffer>(device, size, 1,
+						VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+						minOffsetAlignment)); // minOffsetAlignment may not be necessary here
+			buffers.back()->map();
+		}
+	}
+
+	// *************** Descriptor set wrapper *********************
+
+	void DescriptorSet::addUBO(const UBOCreateInfo& createInfo)
+	{
+		ubos.push_back(std::make_unique<UBO>(createInfo, framesInFlight));
+	}
+
+	void DescriptorSet::finalize()
+	{
+		sets.resize(framesInFlight);
+		
+		DescriptorPool::Builder poolBuilder(device);
+		for (uint32_t i = 0; i < framesInFlight; i++) 
+		{}
+		poolBuilder.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, framesInFlight * ubos.size());
+		
+		pool = poolBuilder.build();
+
+		DescriptorSetLayout::Builder layoutBuilder(device);
+		for (uint32_t i = 0; i < ubos.size(); i++) 
+		{ layoutBuilder.addBinding(i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS); }
+		layout = layoutBuilder.build();
+
+		// for every frame (each UBO has multiple internal buffers)
+		for (uint32_t f = 0; f < framesInFlight; f++)
+		{
+			DescriptorWriter writer(*layout.get(), *pool);
+			for (uint32_t u = 0; u < ubos.size(); u++)
+			{
+				// this is required because vulkan keeps a handle to the buffer info,
+				// reallocation of the info object causes bindings to fail silently
+				const auto bi = getUBO(u).getBuffer(f)->descriptorInfo();
+				bufferInfos.push_back(std::make_unique<VkDescriptorBufferInfo>(bi));
+				writer.writeBuffer(u, bufferInfos.back().get()); // sending pointer
+			}
+			writer.build(sets[f]); // make the descriptor set for that frame
+		}
+	}
+
+	VkDescriptorSetLayout DescriptorSet::getLayout()
+	{
+		assert(layout.get() && "tried to get layout from uninitialized descriptor set");
+		if (!layout.get()) { return VK_NULL_HANDLE; }
+		return layout.get()->getDescriptorSetLayout();
+	}
+
+	UBO& DescriptorSet::getUBO(const uint32_t& uboIndex)
+	{
+		assert(uboIndex < ubos.size() && "ubo index out of range");
+		return *ubos[uboIndex].get();
+	}
+
+	
 
 }  // namespace lve

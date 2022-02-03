@@ -41,10 +41,8 @@ namespace EngineCore
 	};
 
 	// holds common material-specific properties
-	struct MaterialShadingProperties 
+	struct MaterialShadingProperties
 	{
-		MaterialShadingProperties() = default;
-
 		VkPrimitiveTopology primitiveType = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 		VkPolygonMode polygonMode = VK_POLYGON_MODE_FILL;
 		VkCullModeFlags cullModeFlags = VK_CULL_MODE_BACK_BIT; // backface culling
@@ -54,23 +52,21 @@ namespace EngineCore
 	// holds all properties needed to create a material object (used to generate a pipeline config)
 	struct MaterialCreateInfo 
 	{
-		MaterialCreateInfo(VkRenderPass renderPassIn, const ShaderFilePaths& shadersIn,
-						 std::vector<VkDescriptorSetLayout>& setLayoutsIn, const EngineRenderSettings& renderSettingsIn) 
-			: renderPass(renderPassIn), shaderPaths(shadersIn), descriptorSetLayouts(setLayoutsIn),
-			 engineRenderSettings(renderSettingsIn) {};
-		
+		MaterialCreateInfo(const ShaderFilePaths& shadersIn,
+					const std::vector<VkDescriptorSetLayout>& setLayoutsIn) 
+					: shaderPaths(shadersIn), descriptorSetLayouts(setLayoutsIn) {};
+			 
 		MaterialShadingProperties shadingProperties{};
 		ShaderFilePaths shaderPaths; // SPIR-V shaders
-		VkRenderPass renderPass = VK_NULL_HANDLE;
 		std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
-		const EngineRenderSettings& engineRenderSettings;
 	};
 
 	// a material object is mainly an abstraction around a VkPipeline
 	class Material 
 	{
 	public:
-		Material(const MaterialCreateInfo& matInfo, EngineDevice& deviceIn);
+		Material(const MaterialCreateInfo& matInfo, const EngineRenderSettings& rs,
+				VkRenderPass pass, EngineDevice& deviceIn);
 		~Material();
 
 		Material(const Material&) = delete;
@@ -91,18 +87,35 @@ namespace EngineCore
 		
 	private:
 		MaterialCreateInfo materialCreateInfo;
+		const EngineRenderSettings& engineRenderSettings;
+		VkRenderPass renderPass = VK_NULL_HANDLE;
+
 		EngineDevice& device;
 		VkShaderModule vertexShaderModule;
 		VkShaderModule fragmentShaderModule;
 		VkPipelineLayout pipelineLayout;
 		VkPipeline pipeline;
-		
+
 		static void getDefaultPipelineConfig(PipelineConfig& cfg);
 		static void applyMatPropsToPipelineConfig(const MaterialShadingProperties& mp, PipelineConfig& cfg);
 
 		void createShaderModule(const std::string& path, VkShaderModule* shaderModule);
 		void createPipelineLayout();
 		void createPipeline();
+	};
+
+	// handle to a managed material
+	struct MaterialHandle
+	{
+		MaterialHandle() = default;
+		MaterialHandle(Material* m, class MaterialsManager* mg) : materialPtr{ m }, mgr{ mg } {};
+		Material* get() const { return materialPtr; }
+		// report to materials manager one user started/stopped using this material 
+		void matUserAdd(const bool& remove = false) const;
+		void matUserRemove() const { matUserAdd(true); } // calls matUserAdd with remove flag
+	private:
+		Material* materialPtr = nullptr;
+		class MaterialsManager* mgr = nullptr;
 	};
 
 } // namespace

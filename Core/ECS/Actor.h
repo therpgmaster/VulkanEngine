@@ -1,46 +1,47 @@
 #pragma once
 
-#include "Core/ECS/GenericDataObject.h"
 #include "Core/Types/CommonTypes.h"
 #include "Core/WorldSector.h"
 
 // std
 #include <vector>
 
-class ActorComponent;
-class StaticMesh;
-
-// common base class for actor objects which can (but do not necessarily) exist in a world
-// instances could have a spatial presence and occupy 3D space
-class Actor : public GenericDataObject, public World::PhysicalElementInterface
+namespace ECS 
 {
-public:
-	Actor() = default;
-	~Actor();
+	class ActorComponent; // forward-declaration
 
-	ActorTransform transform;
-
-	/* keeps track of all the components registered to this actor, may not preserve indices */
-	std::vector<ActorComponent*> components;
-
-	void componentPendingDeletion(ActorComponent* component);
-
-protected:
-	/* must be called manually for each defined member component after initialization */
-	void registerComponent(ActorComponent& component, const bool& enableComponentTick, const bool& hasMesh);
-
-	/* deletes and unregisters a component belonging to this actor */
-	void removeComponent(ActorComponent* component);
-
-private:
-	/* if false, user defined tick functions will be skipped for this actor and its components */
-	bool hasTickEnabled;
-
-	struct ActorTransform 
+	/*	common base class for actor objects which can exist in a world
+		instances could have a spatial presence and occupy 3D space */
+	class Actor : public World::PhysicalElementInterface
 	{
-		float x;
-		float y;
-		float z;
-	};
+	public:
+		Actor() = default;
+		~Actor();
 
-};
+		ActorTransform transform;
+
+		/* keeps track of all the components registered to this actor, may not preserve indices */
+		std::vector<ActorComponent*> components;
+
+		void componentDeletionSelfReport(ActorComponent* caller);
+
+	protected:
+		/* must be called for each user-declared component after initialization (e.g, in custom actor class constructor) */
+		void registerComponent(ActorComponent* component);
+		/* unregisters a component belonging to this actor, but does not delete it */
+		void unregisterComponent(ActorComponent* component);
+		/* deletes and unregisters a component (also disables deletion-self-reporting) */
+		void destroyComponent(ActorComponent* component);
+
+	private:
+		void unregisterComponent_internal(const uint32_t& i, const bool& setNullParent);
+
+		/* if false, user defined tick functions will be skipped for this actor and its components */
+		bool hasTickEnabled = false;
+
+		// returns index (temporary) if found, -1 otherwise
+		uint32_t findComponent(ActorComponent* childComponent);
+		
+
+	};
+} // namespace

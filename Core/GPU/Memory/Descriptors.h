@@ -8,6 +8,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include <iostream>// debug only
 
 namespace EngineCore
 {
@@ -98,7 +99,7 @@ namespace EngineCore
 		std::vector<VkWriteDescriptorSet> writes;
 	};
 
-	// common shader input parameters
+	/*
 	struct SceneGlobalDataBuffer
 	{
 		glm::mat4 projectionViewMatrix{ 1.f };
@@ -106,18 +107,92 @@ namespace EngineCore
 		glm::vec3 lightPosition{ -1.f };
 		alignas(16) glm::vec4 lightColor{ 0.1f, 0.4f, 0.8f, 12.f };  // w = intensity
 	};
-
+	
 	class GlobalDescriptorSetManager 
 	{
 		std::unique_ptr<DescriptorPool> globalDescriptorPool{};
 	public:
 		GlobalDescriptorSetManager(EngineDevice& device, const uint32_t& maxFramesInFlight);
 
-		std::vector<std::unique_ptr<GBuffer>> sceneGlobalBuffers;
-		std::unique_ptr<DescriptorSetLayout> sceneGlobalSetLayout;
-		std::vector<VkDescriptorSet> sceneGlobalSets;
-		// updates one of the scene global descriptor buffers
+		std::vector<std::unique_ptr<GBuffer>> buffers;
+		std::unique_ptr<DescriptorSetLayout> layout;
+		std::vector<VkDescriptorSet> sets;
+		// write to buffer in global set (frameIndex refers to the currect framebuffer, probably 0, 1, or 2)
 		void writeToSceneGlobalBuffer(const uint32_t& frameIndex, SceneGlobalDataBuffer& data, const bool& flush);
+	};*/
+
+	class UBOCreateInfo
+	{
+	public:
+		enum class MemberType { none, scalar, vec2, vec3, vec4, mat4 };
+		UBOCreateInfo(EngineDevice& device) : device{ device } {};
+		void addMember(const MemberType& mt) { memberTypes.push_back(mt); }
+
+	private:
+		friend class UBO;
+		std::vector<MemberType> memberTypes;
+		EngineDevice& device;
+	};
+
+	class UBO
+	{
+	public:
+		UBO(const UBOCreateInfo& createInfo, const uint32_t& numBuffers);
+
+		GBuffer* getBuffer(const uint32_t& index) { return buffers[index].get(); }
+
+	private:
+		friend class DescriptorSet;
+		using MT = UBOCreateInfo::MemberType;
+		struct MemberInfo
+		{
+			MemberInfo(const size_t& a, const size_t& s) : alignment{ a }, size{ s }{};
+			size_t offset = 0; size_t size;  size_t alignment;
+		};
+
+		std::vector<MemberInfo> members;
+		std::vector<std::unique_ptr<GBuffer>> buffers;
+		size_t size = 0; // size of one buffer, padding included
+
+		void addMembers(const std::vector<MT>& memberTypes);
+		MemberInfo getMemberTypeInfo(const MT& t);
+		void createBuffers(EngineDevice& device, const uint32_t& numBuffers);
+		void writeMember(const uint32_t& i, void* dataSize, const size_t& size,
+								const uint32_t& bufferIndex, const bool& flush);
+	};
+
+	class DescriptorSet
+	{
+	public:
+		DescriptorSet(EngineDevice& device, const uint32_t& maxFramesInFlight)
+			: device{ device }, framesInFlight{ maxFramesInFlight } 
+			{ assert(maxFramesInFlight > 0); }
+
+		void addUBO(const UBOCreateInfo& createInfo);
+		void finalize();
+
+		template<typename T>
+		void writeUBOMember(const uint32_t& uboIndex, T& data, const uint32_t& memberIndex,
+							const uint32_t& frameIndex, const bool& flush = true)
+		{
+			getUBO(uboIndex).writeMember(memberIndex, (void*)&data, sizeof(T), frameIndex, flush);
+		}
+
+		UBO& getUBO(const uint32_t& uboIndex);
+		VkDescriptorSetLayout getLayout();
+		VkDescriptorSet getDescriptorSet(const uint32_t& frameIndex) { return sets[frameIndex]; }
+
+	private:
+		std::unique_ptr<DescriptorPool> pool{};
+		std::unique_ptr<DescriptorSetLayout> layout; // layout of this set
+		std::vector<VkDescriptorSet> sets; // per frame copies
+		std::vector<std::unique_ptr<UBO>> ubos;
+		/*	the bufferInfos container is ABSOLUTELY NECESSARY
+			to preserve buffer pointers for vulkan */
+		std::vector<std::unique_ptr<VkDescriptorBufferInfo>> bufferInfos;
+		
+		EngineDevice& device;
+		uint32_t framesInFlight; // num copies to create of each buffer
 	};
 
 }

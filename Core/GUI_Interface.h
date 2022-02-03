@@ -7,6 +7,8 @@
 #include "ThirdParty/imgui/imgui_impl_vulkan.h"
 #include "ThirdParty/imgui/imgui_impl_glfw.h"
 
+#include <string>
+
 namespace EngineCore 
 {
 	struct GUIRenderPass 
@@ -45,8 +47,8 @@ namespace EngineCore
 		}
 
 		// this tells imgui that we're done setting up the current frame,
-		// then gets the draw data from imgui and uses it to record to the provided
-		// command buffer the necessary draw commands
+		// then gets the draw data from imgui and uses it to record the necessary draw commands
+		// to the provided command buffer 
 		void render(VkCommandBuffer commandBuffer) 
 		{
 			ImGui::Render();
@@ -55,6 +57,11 @@ namespace EngineCore
 		}
 
 		void demo() { ImGui::ShowDemoWindow(); }
+
+		// for low-level text rendering, see void ImFont::RenderText at line 3536 imgui_draw.h
+		// for font atlas building, see ImFontAtlas::Build() at line 2255 imgui_draw.cpp
+		// two build modes are available, StbTruetype and FreeType (FreeType seems to be the best)
+		void loadFont(const std::string& path);
 
 	private:
 		EngineDevice& device;

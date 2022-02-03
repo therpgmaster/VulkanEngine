@@ -9,21 +9,17 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 
-// included here because warning-ignore hack only works in header files
-#pragma warning(push, 0)
-#include "ThirdParty/tiny_obj_loader.h"
-#pragma warning(pop)
-
 // std
 #include <vector>
 #include <stdexcept>
 #include <memory>
 
-namespace EngineCore
+namespace ECS 
 {
-
-	class StaticMesh : public ActorComponent
+	class Primitive
 	{
+		Transform transform{}; // TODO: primitive should not have its own transform, 
+		// instead, getTransform() should be overloaded on components that inherit from Primitive - also remove setTransform()!
 	public:
 		struct Vertex
 		{
@@ -36,52 +32,49 @@ namespace EngineCore
 			static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();
 		};
 
-		struct MeshBuilder 
+		struct MeshBuilder
 		{
 			std::vector<Vertex> vertices{};
 			std::vector<uint32_t> indices{};
 			void makeCubeMesh();
 			void loadFromFile(const std::string& path);
 		};
-		
 
-		StaticMesh(EngineDevice& engineDevice, const MeshBuilder& builder);
-		StaticMesh(EngineDevice& engineDevice, const std::vector<Vertex>& vertices);
-		StaticMesh(EngineDevice& engineDevice);
-		~StaticMesh();
+		Primitive(EngineCore::EngineDevice& engineDevice, const MeshBuilder& builder);
+		Primitive(EngineCore::EngineDevice& engineDevice, const std::vector<Vertex>& vertices);
+		Primitive(EngineCore::EngineDevice& engineDevice);
+		~Primitive();
 
-		StaticMesh(const StaticMesh&) = delete;
-		StaticMesh& operator=(const StaticMesh&) = delete;
+		Primitive(const Primitive&) = delete;
+		Primitive& operator=(const Primitive&) = delete;
 
 		// binds the primitive's vertices to a command buffer (preparation to render)
 		void bind(VkCommandBuffer commandBuffer);
 		// records a draw call to the command buffer (final step to render mesh)
 		void draw(VkCommandBuffer commandBuffer);
 
-		// assigns this mesh a new material, destroying the old one
-		void setMaterial(const MaterialCreateInfo& mci)
-		{
-			material.reset();
-			material = std::make_unique<Material>(mci, engineDevice);
-		}
+		// apply a new material (reports one user removed from previous material)
+		void setMaterial(const EngineCore::MaterialHandle& newMaterial);
+		EngineCore::Material* getMaterial() const { return materialHandle.get(); }
 
-		Material* getMaterial() { return material.get(); }
-		
+		bool useFakeScale = false; //TODO: TMP - FakeScaleTest082
+
+		Transform& getTransform() { return transform; } // this should be changed to virtual, returning const
+		void setTransform(const Transform& t) { transform = t; }
+
 	private:
 		void createVertexBuffers(const std::vector<Vertex>& vertices);
 		void createIndexBuffers(const std::vector<uint32_t>& indices);
 
-		EngineDevice& engineDevice;
+		EngineCore::EngineDevice& engineDevice;
 
-		std::unique_ptr<GBuffer> vertexBuffer;
+		std::unique_ptr<EngineCore::GBuffer> vertexBuffer;
 		uint32_t vertexCount;
 
 		bool hasIndexBuffer = false;
-		std::unique_ptr<GBuffer> indexBuffer;
+		std::unique_ptr<EngineCore::GBuffer> indexBuffer;
 		uint32_t indexCount;
 
-		// owned material object
-		std::unique_ptr<Material> material;
-
+		EngineCore::MaterialHandle materialHandle{};
 	};
-}
+} // namespace
