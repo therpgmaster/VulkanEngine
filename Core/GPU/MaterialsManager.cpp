@@ -26,6 +26,7 @@ namespace EngineCore
 	MaterialsManager::mgrMatInfo* MaterialsManager::find(const Material* m)
 	{
 		for (auto& h : materials) { if (h.ptr == m) { return &h; } }
+		return nullptr;
 	}
 
 	void MaterialsManager::freeMaterial(MaterialsManager::mgrMatInfo& m)

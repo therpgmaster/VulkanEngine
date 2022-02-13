@@ -75,8 +75,6 @@ namespace EngineCore
 		// begins the main window event loop
 		void startExecution();
 
-		
-
 		// TODO: move this function somewhere else
 		// also remove temporaries, search for "FakeScaleTest082"
 		//void simulateDistanceByScale(const StaticMesh& mesh, const Transform& cameraTransform);

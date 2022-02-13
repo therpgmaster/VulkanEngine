@@ -37,7 +37,7 @@ namespace EngineCore
 		std::string vertPath;
 		std::string fragPath;
 		ShaderFilePaths() = default;
-		ShaderFilePaths(const char* vert, const char* frag) : vertPath{ vert }, fragPath{ frag } {};
+		ShaderFilePaths(const std::string& vert, const std::string& frag) : vertPath{ vert }, fragPath{ frag } {};
 	};
 
 	// holds common material-specific properties

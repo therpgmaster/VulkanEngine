@@ -88,7 +88,7 @@ namespace EngineCore
 		DescriptorWriter(DescriptorSetLayout& setLayout, DescriptorPool& pool);
 
 		DescriptorWriter& writeBuffer(uint32_t binding, VkDescriptorBufferInfo* bufferInfo);
-		DescriptorWriter& writeImage(uint32_t binding, VkDescriptorImageInfo* imageInfo);
+		DescriptorWriter& writeImage(uint32_t binding, VkDescriptorImageInfo* imageInfo, uint32_t arrSize = 1);
 
 		bool build(VkDescriptorSet& set);
 		void overwrite(VkDescriptorSet& set);
@@ -134,6 +134,7 @@ namespace EngineCore
 		EngineDevice& device;
 	};
 
+	/* uniform buffer abstraction - this represents a specialized GPU buffer for in-shader (descriptor set) use */
 	class UBO
 	{
 	public:
@@ -161,22 +162,29 @@ namespace EngineCore
 								const uint32_t& bufferIndex, const bool& flush);
 	};
 
+	/*	descriptor set abstraction, this enables descriptor sets to be managed as self-contained objects, 
+		and allows descriptors to be easily defined and bound at runtime */
 	class DescriptorSet
 	{
 	public:
 		DescriptorSet(EngineDevice& device, const uint32_t& maxFramesInFlight)
 			: device{ device }, framesInFlight{ maxFramesInFlight } 
-			{ assert(maxFramesInFlight > 0); }
+			{ assert(maxFramesInFlight > 0); };
+		DescriptorSet(const DescriptorSet&) = delete;
+		DescriptorSet& operator=(const DescriptorSet&) = delete;
 
+		// add a descriptor to the set, actual binding indices depend on the order in the finalize function
 		void addUBO(const UBOCreateInfo& createInfo);
-		void finalize();
+		void addCombinedImageSampler(const VkImageView& view, const VkSampler& sampler);
+		void addImageArray(const std::vector<VkImageView>& views);
+		void addSampler(const VkSampler& sampler);
 
-		template<typename T>
+		void finalize(); // allocates descriptors, builds the set layout and VkDescriptorSets  
+
+		template<typename T> // user-friendly uniform buffer data push function
 		void writeUBOMember(const uint32_t& uboIndex, T& data, const uint32_t& memberIndex,
 							const uint32_t& frameIndex, const bool& flush = true)
-		{
-			getUBO(uboIndex).writeMember(memberIndex, (void*)&data, sizeof(T), frameIndex, flush);
-		}
+		{ getUBO(uboIndex).writeMember(memberIndex, (void*)&data, sizeof(T), frameIndex, flush); }
 
 		UBO& getUBO(const uint32_t& uboIndex);
 		VkDescriptorSetLayout getLayout();
@@ -185,11 +193,14 @@ namespace EngineCore
 	private:
 		std::unique_ptr<DescriptorPool> pool{};
 		std::unique_ptr<DescriptorSetLayout> layout; // layout of this set
-		std::vector<VkDescriptorSet> sets; // per frame copies
-		std::vector<std::unique_ptr<UBO>> ubos;
-		/*	the bufferInfos container is ABSOLUTELY NECESSARY
-			to preserve buffer pointers for vulkan */
+		std::vector<VkDescriptorSet> sets; // per frame (identical layout)
+		std::vector<std::unique_ptr<UBO>> ubos; // managed ubo (each has internal per-frame buffers)
+		// descriptor info containers necessary to preserve pointers for vulkan
 		std::vector<std::unique_ptr<VkDescriptorBufferInfo>> bufferInfos;
+		std::vector<std::unique_ptr<VkDescriptorImageInfo>> samplerImageInfos;
+		std::vector<std::unique_ptr<VkDescriptorImageInfo>> imageArraysInfos; // must be contiguous
+		std::vector<uint32_t> imageArraysSizes;
+		std::vector<std::unique_ptr<VkDescriptorImageInfo>> samplerInfos;
 		
 		EngineDevice& device;
 		uint32_t framesInFlight; // num copies to create of each buffer

@@ -17,6 +17,8 @@ layout(std140, set = 0, binding = 1) uniform UBO2
 	vec3 hue;
 } ubo2;
 
+layout(set = 0, binding = 2) uniform sampler2D texSampler;
+
 layout(push_constant) uniform Push	
 {
 	mat4 transform;
@@ -33,5 +35,6 @@ void main()
 	//vec3 lightDiffuse = lightColor * max(dot(normalize(fragNormalWS), normalize(dirToLight)), 0);
 
 	//outColor = vec4((lightDiffuse + lightAmbient) * fragColor, 1.0);
-	outColor = vec4(fragUV.x * ubo2.hue.x, fragUV.y * ubo2.hue.y, 0.5 * ubo2.hue.z, 1.0); // test uv coords
+	//outColor = vec4(fragUV.x * ubo2.hue.x, fragUV.y * ubo2.hue.y, 0.5 * ubo2.hue.z, 1.0); // test uv coords
+	outColor = texture(texSampler, fragUV);
 }

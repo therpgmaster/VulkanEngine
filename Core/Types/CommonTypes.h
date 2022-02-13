@@ -4,6 +4,8 @@
 #include <glm/glm.hpp>
 #include "Core/Types/Math.h"
 
+#include <string>
+
 template<typename T = float>
 class Vector3D
 {
@@ -200,3 +202,12 @@ public:
 	VectorInt operator+(const VectorInt& other) { return VectorInt{ x + other.x, y + other.y, z + other.z }; }
 	VectorInt operator-(const VectorInt& other) { return VectorInt{ x - other.x, y - other.y, z - other.z }; }
 };
+
+static std::string makePath(const char* pathIn)
+{
+	// TODO: hardcoded path, subject to change  
+	std::string dir = "G:/VulkanDev/VulkanEngine/Core/DevResources/"; // relative: "Resources/" absolute: "G:/VulkanDev/VulkanEngine/Core/DevResources/"
+	std::string path = pathIn;
+	dir += path;
+	return dir;
+}

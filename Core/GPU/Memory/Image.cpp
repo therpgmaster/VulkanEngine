@@ -9,33 +9,26 @@
 namespace EngineCore 
 {
 
-	Image::Image(EngineDevice& device, const char* path) : device{ device }
+	Image::Image(EngineDevice& device, const std::string& path) : device{ device }
 	{
 		loadFromDisk(path);
-	}
-
-	Image::Image(EngineDevice& device, GBuffer& src, 
-				uint32_t width, uint32_t height) : device{ device }
-	{
-		assert((src.getUsageFlags() & VK_BUFFER_USAGE_TRANSFER_SRC_BIT) &&
-			"image source buffer did not have VK_BUFFER_USAGE_TRANSFER_SRC_BIT set");
-		
-		initImage(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, width, height);
-		copyBufferToImage(src, static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1);
+		imageView = createImageView(device, image, VK_FORMAT_R8G8B8A8_SRGB);
+		createSampler(sampler, device, 1.f); // TODO: need to check if device supports the anisotropy level!
 	}
 
 	Image::~Image() 
 	{
+		vkDestroyImageView(device.device(), imageView, nullptr);
 		vkDestroyImage(device.device(), image, nullptr);
 		vkFreeMemory(device.device(), imageMemory, nullptr);
 	}
 
 	// loads the image from a file
-	void Image::loadFromDisk(const char* path)
+	void Image::loadFromDisk(const std::string& path)
 	{
 		// import (see Vulkan Tutorial - Texture mapping)
 		int width, height, channels;
-		stbi_uc* pixels = stbi_load(path, &width, &height, &channels, STBI_rgb_alpha);
+		stbi_uc* pixels = stbi_load(path.c_str(), &width, &height, &channels, STBI_rgb_alpha);
 		VkDeviceSize imageSize = width * height * (uint32_t)4;
 		if (!pixels) { throw std::runtime_error("failed to load image"); }
 
@@ -175,6 +168,55 @@ namespace EngineCore
 		device.endSingleTimeCommands(commandBuffer);
 		// transition (again) to a more useful format
 		transitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	}
+
+	VkImageView Image::createImageView(EngineDevice& device, VkImage image, VkFormat format) 
+	{
+		VkImageViewCreateInfo info{};
+		info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		info.image = image;
+		info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		info.format = format;
+		info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		info.subresourceRange.baseMipLevel = 0;
+		info.subresourceRange.levelCount = 1;
+		info.subresourceRange.baseArrayLayer = 0;
+		info.subresourceRange.layerCount = 1;
+
+		VkImageView view;
+		if (vkCreateImageView(device.device(), &info, nullptr, &view) != VK_SUCCESS) 
+		{ throw std::runtime_error("failed to create image view"); }
+
+		return view;
+	}
+
+	void Image::createSampler(VkSampler& samplerHandleOut, EngineDevice& device, const float& anisotropy)
+	{
+		VkSamplerCreateInfo info{};
+		info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		info.magFilter = VK_FILTER_LINEAR;
+		info.minFilter = VK_FILTER_LINEAR;
+
+		info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+		info.unnormalizedCoordinates = VK_FALSE;
+
+		info.anisotropyEnable = anisotropy > 0.f ? VK_TRUE : VK_FALSE;
+		info.maxAnisotropy = anisotropy;
+
+		info.compareEnable = VK_FALSE;
+		info.compareOp = VK_COMPARE_OP_ALWAYS;
+
+		info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		info.mipLodBias = 0.0f;
+		info.minLod = 0.0f;
+		info.maxLod = 0.0f;
+
+		if (vkCreateSampler(device.device(), &info, nullptr, &samplerHandleOut) != VK_SUCCESS)
+		{ throw std::runtime_error("failed to create texture sampler"); }
+
 	}
 
 } // namespace

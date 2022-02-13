@@ -1,5 +1,6 @@
 #include "Core/GPU/Memory/Descriptors.h"
 #include "Core/Types/Math.h"
+#include "Core/GPU/Memory/Image.h"
 
 // std
 #include <cassert>
@@ -168,21 +169,21 @@ namespace EngineCore
 		return *this;
 	}
 
-	DescriptorWriter& DescriptorWriter::writeImage(uint32_t binding, VkDescriptorImageInfo* imageInfo)
+	DescriptorWriter& DescriptorWriter::writeImage(uint32_t binding, VkDescriptorImageInfo* imageInfo, uint32_t arrSize)
 	{
-		assert(setLayout.bindings.count(binding) == 1 && "Layout does not contain specified binding");
+		assert(setLayout.bindings.count(binding) == 1 && "failed to write descriptor binding, not present in layout");
 
 		auto& bindingDescription = setLayout.bindings[binding];
 
-		assert(bindingDescription.descriptorCount == 1 &&
-			"Binding single descriptor info, but binding expects multiple");
+		assert(arraySize == bindingDescription.descriptorCount &&
+			"failed to write array descriptor binding, count must match set layout");
 
 		VkWriteDescriptorSet write{};
 		write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		write.descriptorType = bindingDescription.descriptorType;
 		write.dstBinding = binding;
 		write.pImageInfo = imageInfo;
-		write.descriptorCount = 1;
+		write.descriptorCount = arrSize; // if binding multiple, imageInfo must be ptr to array
 
 		writes.push_back(write);
 		return *this;
@@ -302,35 +303,112 @@ namespace EngineCore
 		ubos.push_back(std::make_unique<UBO>(createInfo, framesInFlight));
 	}
 
+	void DescriptorSet::addCombinedImageSampler(const VkImageView& view, const VkSampler& sampler)
+	{
+		VkDescriptorImageInfo info{};
+		info.imageView = view;
+		info.sampler = sampler;
+		info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // correct layout assumed
+		samplerImageInfos.push_back(std::make_unique<VkDescriptorImageInfo>(info));
+	}
+
+	void DescriptorSet::addImageArray(const std::vector<VkImageView>& views)
+	{
+		assert(!views.empty() && "tried to add empty image array descriptor");
+		// add array (single binding, but each image in array must have its own info)
+		for (const auto& imageView : views)
+		{
+			VkDescriptorImageInfo info{};
+			info.sampler = nullptr;
+			info.imageView = imageView;
+			info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // correct layout assumed
+			imageArraysInfos.push_back(std::make_unique<VkDescriptorImageInfo>(info));
+		}
+		imageArraysSizes.push_back(views.size()); // record array length
+	}
+
+	void DescriptorSet::addSampler(const VkSampler& sampler)
+	{
+		VkDescriptorImageInfo info{};
+		info.sampler = sampler;
+		info.imageView = VK_NULL_HANDLE; // just the sampler, no image assigned
+		info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		samplerInfos.push_back(std::make_unique<VkDescriptorImageInfo>(info));
+	}
+
 	void DescriptorSet::finalize()
 	{
 		sets.resize(framesInFlight);
+
+		uint32_t numUBOs = ubos.size();
+		uint32_t numSamplerImages = samplerImageInfos.size();
+		uint32_t numImageArrays = imageArraysSizes.size();
+		uint32_t numSamplers = samplerInfos.size();
 		
 		DescriptorPool::Builder poolBuilder(device);
-		for (uint32_t i = 0; i < framesInFlight; i++) 
-		{}
-		poolBuilder.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, framesInFlight * ubos.size());
+		poolBuilder.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, framesInFlight * numUBOs);
+		poolBuilder.addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, numSamplerImages);
+		for (auto& s : imageArraysSizes) 
+		{ poolBuilder.addPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, s); }
+		poolBuilder.addPoolSize(VK_DESCRIPTOR_TYPE_SAMPLER, numSamplers);
 		
 		pool = poolBuilder.build();
-
+		
 		DescriptorSetLayout::Builder layoutBuilder(device);
-		for (uint32_t i = 0; i < ubos.size(); i++) 
+		// add uniform buffer bindings to layout
+		for (uint32_t i = 0; i < numUBOs; i++) /* UBOs start at binding index 0 */
 		{ layoutBuilder.addBinding(i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS); }
+		// add combined image sampler bindings to layout
+		for (uint32_t i = 0; i < numSamplerImages; i++) /* place combined sampler bindings after UBOs */
+		{ layoutBuilder.addBinding(i + numUBOs, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_ALL_GRAPHICS); }
+		// add image arrays to layout, one binding per array
+		for (uint32_t i = 0; i < numImageArrays; i++) /* image arrays after combined image samplers */
+		{
+			layoutBuilder.addBinding(i + numUBOs + numSamplerImages,
+				VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_ALL_GRAPHICS, imageArraysSizes[i]);
+		}
+		// add sampler-only bindings
+		for (uint32_t i = 0; i < numSamplers; i++) /* last binding category */
+		{ 
+			layoutBuilder.addBinding(i + numUBOs + numSamplerImages + numImageArrays, 
+			VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_ALL_GRAPHICS);
+		}
+
 		layout = layoutBuilder.build();
 
-		// for every frame (each UBO has multiple internal buffers)
+		// create descriptors for each frame (UBOs have multiple internal buffers)
 		for (uint32_t f = 0; f < framesInFlight; f++)
 		{
 			DescriptorWriter writer(*layout.get(), *pool);
-			for (uint32_t u = 0; u < ubos.size(); u++)
+			// add samplers
+			for (uint32_t i = 0; i < numSamplers; i++)
+			{
+				writer.writeImage(i + numUBOs + numSamplerImages + numImageArrays, samplerInfos[i].get());
+			}
+			// add image arrays, one binding per array - currently re-using same images for all frames
+			auto arrStart = 0;
+			for (uint32_t a = 0; a < numImageArrays; a++)
+			{
+				const auto arrSize = imageArraysSizes[a];
+				writer.writeImage(a + numUBOs + numSamplerImages,
+								imageArraysInfos[arrStart].get(), arrSize);
+				arrStart += arrSize; // move offset to next array start index
+			}
+			// add combined image samplers
+			for (uint32_t i = 0; i < numSamplerImages; i++)
+			{
+				writer.writeImage(i + numUBOs, samplerImageInfos[i].get());
+			}
+			// add uniform buffers
+			for (uint32_t u = 0; u < numUBOs; u++)
 			{
 				// this is required because vulkan keeps a handle to the buffer info,
-				// reallocation of the info object causes bindings to fail silently
+				// reallocation of info objects causes bindings to fail silently
 				const auto bi = getUBO(u).getBuffer(f)->descriptorInfo();
 				bufferInfos.push_back(std::make_unique<VkDescriptorBufferInfo>(bi));
 				writer.writeBuffer(u, bufferInfos.back().get()); // sending pointer
 			}
-			writer.build(sets[f]); // make the descriptor set for that frame
+			writer.build(sets[f]); // make descriptor set for frame
 		}
 	}
 

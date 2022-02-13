@@ -5,11 +5,13 @@
 #include "Core/Camera.h"
 #include "Core/GPU/Material.h"
 #include "Core/GPU/Memory/Buffer.h"
+#include "Core/GPU/Memory/Image.h"
 #include "Core/GUI_Interface.h"
 
 #include <stdexcept>
 #include <array>
 #include <iostream>
+#include <string>
 
 // glm
 #define GLM_FORCE_RADIANS
@@ -34,6 +36,10 @@ namespace EngineCore
 		//std::vector<VkDescriptorSetLayout> setLayout =
 		//{ globalDSetMgr.layout.get()->getDescriptorSetLayout() };
 
+		// texture test (TODO: this is not an ideal way to store these objects)
+		Image& marsTexture = *new Image(device, makePath("Textures/mars6k_v2.jpg"));
+		Image& spaceTexture = *new Image(device, makePath("Textures/space.png"));
+
 		// runtime descriptors test
 		UBOCreateInfo ubo1{ device };
 		ubo1.addMember(UBOCreateInfo::MemberType::mat4);
@@ -42,12 +48,13 @@ namespace EngineCore
 
 		dset.addUBO(ubo1);
 		dset.addUBO(ubo2);
+		dset.addCombinedImageSampler(marsTexture.imageView, marsTexture.sampler);
+		dset.addCombinedImageSampler(spaceTexture.imageView, spaceTexture.sampler);
 		dset.finalize();
-
 		std::vector<VkDescriptorSetLayout> dsetLayout = { dset.getLayout() };
 		
 		// prepare for sky rendering
-		//SkyRenderSystem skyRenderSys{ materialsMgr, dsetLayout, device };
+		SkyRenderSystem skyRenderSys{ materialsMgr, dsetLayout, device };
 		
 		// TODO: this is a temporary single-camera setup
 		Camera camera{ 45.f, 0.8f, 10.f };
@@ -58,8 +65,8 @@ namespace EngineCore
 		setupDefaultInputs();
 
 		// TODO: hardcoded paths - create test materials
-		ShaderFilePaths shader("G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader.vert.spv",
-			"G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader.frag.spv");
+		ShaderFilePaths shader(makePath("Shaders/shader.vert.spv"),
+								makePath("Shaders/shader.frag.spv"));
 		//ShaderFilePaths shader2("G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader.vert.spv",
 			//"G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shaderDifferentColor.frag.spv");
 
@@ -103,7 +110,7 @@ namespace EngineCore
 				dset.writeUBOMember(1, rgb, 0, frameIndex);
 				
 
-				applyWorldOriginOffset(camera.transform); //(TODO: ) experimental
+				//applyWorldOriginOffset(camera.transform); //(TODO: ) experimental
 
 				imguiObj.newFrame(); // imgui
 
@@ -114,7 +121,7 @@ namespace EngineCore
 				//ImGui::Button("Save");
 				
 				// render sky sphere
-				//skyRenderSys.renderSky(commandBuffer, globalDSetMgr.sets[frameIndex], camera.transform.translation);
+				skyRenderSys.renderSky(commandBuffer, dset.getDescriptorSet(frameIndex), camera.transform.translation);
 
 				//simulateDistanceByScale(*loadedMeshes[1], camera.transform); //FakeScaleTest082
 
@@ -129,13 +136,15 @@ namespace EngineCore
 				auto mf = window.input.getAxisValue(0);
 				auto mr = window.input.getAxisValue(1);
 				auto mu = window.input.getAxisValue(2);
-				camera.moveInPlaneXY(lookInput, mf, mr, mu, engineClock.getDelta());
+				auto xs = window.input.getAxisValue(3) > 0 ? true : false;
+				camera.moveInPlaneXY(lookInput, mf, mr, mu, xs, engineClock.getDelta());
 
 				renderer.endSwapchainRenderPass(commandBuffer);
 				renderer.endFrame(); // submit command buffer
 				camera.aspectRatio = renderer.getAspectRatio();
 			}
 		}
+		delete& marsTexture; delete& spaceTexture;
 		// window pending close, wait for GPU
 		vkDeviceWaitIdle(device.device());
 	}
@@ -145,10 +154,10 @@ namespace EngineCore
 		using namespace ECS;
 
 		Primitive::MeshBuilder builder{};
-		builder.loadFromFile("G:/VulkanDev/VulkanEngine/Core/DevResources/Meshes/uv_test_cube.obj"); // TODO: hardcoded paths
+		builder.loadFromFile(makePath("Meshes/mars.obj")); // TODO: hardcoded path
 		loadedMeshes.push_back(new Primitive(device, builder));
-		loadedMeshes[0]->getTransform().translation = Vec{7.f, 0.f, 0.f};
-		loadedMeshes[0]->getTransform().scale = 5.f;
+		loadedMeshes[0]->getTransform().translation = Vec{160.f, 0.f, 0.f};
+		loadedMeshes[0]->getTransform().scale = 120.f;
 
 		/*builder.loadFromFile("G:/VulkanDev/VulkanEngine/Core/DevResources/Meshes/sphere.obj");
 		loadedMeshes.push_back(new Primitive(device, builder)); 
@@ -181,6 +190,8 @@ namespace EngineCore
 		// up/down
 		uint32_t upAxisIndex = inputSys.addBinding(KeyBinding(GLFW_KEY_R, 1.f), "kbUpAxis");
 		inputSys.addBinding(KeyBinding(GLFW_KEY_F, -1.f), upAxisIndex);
+		// move faster
+		inputSys.addBinding(KeyBinding(GLFW_KEY_LEFT_SHIFT, 1.f), "kbFasterAxis");
 	}
 	/*
 	void EngineApplication::simulateDistanceByScale(const StaticMesh& mesh, const Transform& cameraTransform)

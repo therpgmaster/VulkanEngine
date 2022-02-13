@@ -31,8 +31,9 @@ namespace EngineCore
 									0, 1, &sceneGlobalDescriptorSet, 0, nullptr);
 
 			// spin 3D primitive - demo
-			float spinRate = 0.0f;//0.8f;
+			float spinRate = 0.1f;
 			mesh.getTransform().rotation.z = glm::mod(mesh.getTransform().rotation.z + spinRate * deltaTimeSeconds, glm::two_pi<float>());
+			mesh.getTransform().rotation.y = glm::mod(mesh.getTransform().rotation.y + spinRate * 0.8f * deltaTimeSeconds, glm::two_pi<float>());
 
 			/*if (camera != nullptr)
 			{

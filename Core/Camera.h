@@ -198,10 +198,12 @@ public:
 		return pmatrix;
 	}
 
-	void moveInPlaneXY(const Vector2D<double>& lookInput, const float& moveFwd, const float& moveRight, const float& moveUp, const float& deltaTime)
+	void moveInPlaneXY(const Vector2D<double>& lookInput, const float& moveFwd, const float& moveRight, 
+					const float& moveUp, const bool& extraSpeed, const float& deltaTime)
 	{
 		float lookSpeed = 6.8f;
-		float moveSpeed = 12.f;
+		float moveSpeed = 27.f;
+		if (extraSpeed) { moveSpeed *= 15.f; }
 
 		float yawInput = lookInput.x != 0 ? lookInput.x / abs(lookInput.x) : 0.f; 
 		float pitchInput = lookInput.y != 0 ? lookInput.y / abs(lookInput.y) : 0.f;

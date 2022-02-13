@@ -7,13 +7,14 @@ namespace EngineCore
 									EngineDevice& device)
 	{
 		// TODO: hardcoded paths
-		const std::string meshPath = "G:/VulkanDev/VulkanEngine/Core/DevResources/Meshes/skysphere.obj";
-		ShaderFilePaths skyShaders("G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/sky.vert.spv",
-									"G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/sky.frag.spv");
+		const std::string meshPath = makePath("Meshes/skysphere.obj");
+		ShaderFilePaths skyShaders(makePath("Shaders/sky.vert.spv"), makePath("Shaders/sky.frag.spv"));
+
 		// prepare sky mesh
 		ECS::Primitive::MeshBuilder builder{};
 		builder.loadFromFile(meshPath);
 		skyMesh = std::make_unique<ECS::Primitive>(device, builder);
+		skyMesh->getTransform().scale = 100000.f;
 
 		// create unique material for sky
 		MaterialCreateInfo matInfo(skyShaders, setLayouts);

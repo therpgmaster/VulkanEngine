@@ -37,7 +37,7 @@ namespace EngineCore
 			}
 		}
 	private:
-		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_2_BIT; // default
+		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_8_BIT; // default
 	};
 
 	struct EngineRenderSettings
