@@ -240,48 +240,78 @@ namespace EngineCore
 
 	// *************** Uniform Buffer wrapper *********************
 
-	UBO::UBO(const UBOCreateInfo& createInfo, const uint32_t& numBuffers)
+	UBO::UBO(const UBOCreateInfo& createInfo, uint32_t numBuffers)
 	{
-		addMembers(createInfo.memberTypes);
+		addMembers(createInfo.members);
 		createBuffers(createInfo.device, numBuffers);
 	}
 
-	void UBO::writeMember(const uint32_t& i, void* data, const size_t& dataSize,
-								const uint32_t& bufferIndex, const bool& flush)
+	void UBO::writeMember(const MemberAccessor& m, void* data, const size_t& dataSize,
+						uint32_t bufferIndex, bool flush)
 	{
-		assert(i < members.size() && "invalid member index, could not write to uniform buffer");
-		auto& m = members[i];
-		if (m.size != size) { throw std::runtime_error("incompatible type size, could not write to uniform buffer"); }
+		assert(m.i < members.size() && "cannot write to uniform buffer, invalid member index");
+		const auto& dst_size = members[m.i].sizes[m.field_i];
+		const auto& dst_offset = members[m.i].offsets[m.field_i];
+		if (dst_size != size) { throw std::runtime_error("cannot write to uniform buffer, incompatible data size"); }
 
 		getBuffer(bufferIndex)->writeToBuffer(data, dataSize, m.offset);
 		if (flush) { getBuffer(bufferIndex)->flush(); }
 	}
 
-	void UBO::addMembers(const std::vector<MT>& memberTypes)
+	void UBO::addMembers(const std::vector<MTCI>& memberCreateInfos)
 	{
-		for (auto& t : memberTypes)
+		for (auto& memberInfo : memberCreateInfos)
 		{
-			if (t == MT::none) { throw std::runtime_error("cannot add member to ubo, unspecified type"); }
-			// vulkan alignment requirements for data used in uniform buffer descriptors
-			auto m = getMemberTypeInfo(t);
-			assert(m.size > 0 && "cannot add member to ubo, unknown size");
-			// find suitable offset (location) for the data member, at its required alignment
-			m.offset = Math::roundUpToClosestMultiple(size, m.alignment);
+			if (memberInfo.types.empty()) { throw std::runtime_error("cannot add member to uniform buffer, unspecified type info"); }
+			// calculate alignments
+			std::vector<uint32_t> alignments;
+			std::vector<uint32_t> sizes;
+			for (auto& t : memberInfo.types) 
+			{
+				uint32_t t_size, t_alignment;
+				// get alignment requirement for simple data type
+				getIntrTypeAlignment(t, t_size, t_alignment);
+				alignments.push_back(t_alignment);
+				sizes.push_back(t_size);
+			}
+
+			Member m;
+
+			// structs must be aligned to the largest alignment of their elements
+			uint32_t alignMax = 0;
+			for (const auto& a : alignments) { if (a > alignMax) { alignMax = a; } }
+			if (alignments.size() > 1) { alignments[0] = alignMax; }
+
+			size_t start = size; // memory location relative to buffer start
+			size_t totalMemberSize = 0;
+			// decide location for each individual data element
+			for (uint32_t i = 0; i < alignments.size(); i++)
+			{
+				// find suitable offset (location) for element, at its required alignment
+				const size_t offset = Math::roundUpToClosestMultiple(start, (size_t)alignments[i]);
+				m.offsets.push_back(offset);
+				m.sizes.push_back((size_t)sizes[i]);
+				totalMemberSize += offset + sizes[i];
+			}
+
+			m.arrayStride = 
+			m.arrayLength = memberInfo.arrayLength;
 			members.push_back(m);
-			size = m.offset + m.size; // increase total size of buffer
+			size += totalMemberSize; // increase size of buffer
 		}
 	}
 
-	UBO::MemberInfo UBO::getMemberTypeInfo(const MT& t)
+	void UBO::getIntrTypeAlignment(const IMT& t, uint32_t& sizeOut, uint32_t& alignmentOut) const
 	{
 		// vulkan imposes alignment requirements for data used in uniform buffer descriptors
-		MemberInfo m{ 0, 0 };
-		if (t == MT::scalar) { m = MemberInfo(4, 4); } // 1 * scalar
-		else if (t == MT::vec2) { m = MemberInfo(8, 8); } // 2 * scalar
-		else if (t == MT::vec3) { m = MemberInfo(16, 12); } // 4 * scalar
-		else if (t == MT::vec4) { m = MemberInfo(16, 16); } // 4 * scalar
-		else if (t == MT::mat4) { m = MemberInfo(16, 64); } // 4 * scalar
-		return m;
+		uint32_t a = 0;
+		uint32_t s = 0;
+		if (t == IMT::scalar)		{ a = 4; s = 4; } // 1 * scalar
+		else if (t == IMT::vec2)	{ a = 8; s = 8; } // 2 * scalar
+		else if (t == IMT::vec3)	{ a = 16; s = 12; } // 4 * scalar
+		else if (t == IMT::vec4)	{ a = 16; s = 16; } // 4 * scalar
+		else if (t == IMT::mat4)	{ a = 16; s = 64; } // 4 * scalar
+		assert(s > 0 && "failed to get alignment and size for uniform buffer member, unknown type");
 	}
 
 	void UBO::createBuffers(EngineDevice& device, const uint32_t& numBuffers)
@@ -291,7 +321,7 @@ namespace EngineCore
 		{
 			buffers.push_back(std::make_unique<GBuffer>(device, size, 1,
 						VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-						minOffsetAlignment)); // minOffsetAlignment may not be necessary here
+						minOffsetAlignment));
 			buffers.back()->map();
 		}
 	}
@@ -316,14 +346,16 @@ namespace EngineCore
 	{
 		assert(!views.empty() && "tried to add empty image array descriptor");
 		// add array (single binding, but each image in array must have its own info)
+		std::vector<VkDescriptorImageInfo> infos{};
 		for (const auto& imageView : views)
 		{
-			VkDescriptorImageInfo info{};
-			info.sampler = nullptr;
-			info.imageView = imageView;
-			info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // correct layout assumed
-			imageArraysInfos.push_back(std::make_unique<VkDescriptorImageInfo>(info));
+			VkDescriptorImageInfo imgInfo{};
+			imgInfo.sampler = nullptr;
+			imgInfo.imageView = imageView;
+			imgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // correct layout assumed
+			infos.push_back(imgInfo);
 		}
+		imageArraysInfos.push_back(infos); // add array image infos
 		imageArraysSizes.push_back(views.size()); // record array length
 	}
 
@@ -346,11 +378,10 @@ namespace EngineCore
 		uint32_t numSamplers = samplerInfos.size();
 		
 		DescriptorPool::Builder poolBuilder(device);
-		poolBuilder.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, framesInFlight * numUBOs);
-		poolBuilder.addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, numSamplerImages);
-		for (auto& s : imageArraysSizes) 
-		{ poolBuilder.addPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, s); }
-		poolBuilder.addPoolSize(VK_DESCRIPTOR_TYPE_SAMPLER, numSamplers);
+		if (numUBOs > 0) { poolBuilder.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, framesInFlight * numUBOs); }
+		if (numSamplerImages > 0) { poolBuilder.addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, numSamplerImages); }
+		if (numImageArrays > 0) { for (auto& s : imageArraysSizes) { poolBuilder.addPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, s); } }
+		if (numSamplers > 0) { poolBuilder.addPoolSize(VK_DESCRIPTOR_TYPE_SAMPLER, numSamplers); }
 		
 		pool = poolBuilder.build();
 		
@@ -358,56 +389,59 @@ namespace EngineCore
 		// add uniform buffer bindings to layout
 		for (uint32_t i = 0; i < numUBOs; i++) /* UBOs start at binding index 0 */
 		{ layoutBuilder.addBinding(i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS); }
+
 		// add combined image sampler bindings to layout
 		for (uint32_t i = 0; i < numSamplerImages; i++) /* place combined sampler bindings after UBOs */
 		{ layoutBuilder.addBinding(i + numUBOs, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_ALL_GRAPHICS); }
+
 		// add image arrays to layout, one binding per array
 		for (uint32_t i = 0; i < numImageArrays; i++) /* image arrays after combined image samplers */
 		{
 			layoutBuilder.addBinding(i + numUBOs + numSamplerImages,
-				VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_ALL_GRAPHICS, imageArraysSizes[i]);
+			VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_ALL_GRAPHICS, imageArraysSizes[i]);
 		}
+
 		// add sampler-only bindings
 		for (uint32_t i = 0; i < numSamplers; i++) /* last binding category */
 		{ 
 			layoutBuilder.addBinding(i + numUBOs + numSamplerImages + numImageArrays, 
 			VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_ALL_GRAPHICS);
 		}
-
+		
 		layout = layoutBuilder.build();
 
 		// create descriptors for each frame (UBOs have multiple internal buffers)
 		for (uint32_t f = 0; f < framesInFlight; f++)
 		{
 			DescriptorWriter writer(*layout.get(), *pool);
-			// add samplers
-			for (uint32_t i = 0; i < numSamplers; i++)
-			{
-				writer.writeImage(i + numUBOs + numSamplerImages + numImageArrays, samplerInfos[i].get());
-			}
-			// add image arrays, one binding per array - currently re-using same images for all frames
-			auto arrStart = 0;
-			for (uint32_t a = 0; a < numImageArrays; a++)
-			{
-				const auto arrSize = imageArraysSizes[a];
-				writer.writeImage(a + numUBOs + numSamplerImages,
-								imageArraysInfos[arrStart].get(), arrSize);
-				arrStart += arrSize; // move offset to next array start index
-			}
-			// add combined image samplers
-			for (uint32_t i = 0; i < numSamplerImages; i++)
-			{
-				writer.writeImage(i + numUBOs, samplerImageInfos[i].get());
-			}
 			// add uniform buffers
 			for (uint32_t u = 0; u < numUBOs; u++)
 			{
 				// this is required because vulkan keeps a handle to the buffer info,
 				// reallocation of info objects causes bindings to fail silently
 				const auto bi = getUBO(u).getBuffer(f)->descriptorInfo();
-				bufferInfos.push_back(std::make_unique<VkDescriptorBufferInfo>(bi));
-				writer.writeBuffer(u, bufferInfos.back().get()); // sending pointer
+				bufferInfos.push_back(VkDescriptorBufferInfo(bi));
+				writer.writeBuffer(u, &bufferInfos.back()); // sending pointer
 			}
+
+			// add combined image samplers
+			for (uint32_t i = 0; i < numSamplerImages; i++)
+			{
+				writer.writeImage(i + numUBOs, samplerImageInfos[i].get());
+			}
+
+			// add image arrays, one binding per array - currently re-using same images for all frames
+			for (uint32_t a = 0; a < numImageArrays; a++)
+			{
+				writer.writeImage(a + numUBOs + numSamplerImages, imageArraysInfos[a].data(), imageArraysSizes[a]);
+			}
+
+			// add samplers
+			for (uint32_t i = 0; i < numSamplers; i++)
+			{
+				writer.writeImage(i + numUBOs + numSamplerImages + numImageArrays, samplerInfos[i].get());
+			}
+
 			writer.build(sets[f]); // make descriptor set for frame
 		}
 	}
@@ -419,7 +453,7 @@ namespace EngineCore
 		return layout.get()->getDescriptorSetLayout();
 	}
 
-	UBO& DescriptorSet::getUBO(const uint32_t& uboIndex)
+	UBO& DescriptorSet::getUBO(uint32_t uboIndex)
 	{
 		assert(uboIndex < ubos.size() && "ubo index out of range");
 		return *ubos[uboIndex].get();

@@ -10,23 +10,18 @@ layout(location = 1) out vec3 fragPositionWS;
 layout(location = 2) out vec3 fragNormalWS;
 layout(location = 3) out vec2 fragUV;
 
-layout(std140, set = 0, binding = 0) uniform UBO1 
+layout(std140, set = 0, binding = 0) uniform UBO1
 {
 	mat4 projectionViewMatrix;
 } ubo1;
 
-layout(std140, set = 0, binding = 1) uniform UBO2 
-{
-	vec3 hue;
-} ubo2;
-
-layout(push_constant) uniform Push	
+layout(push_constant) uniform Push
 {
 	mat4 transform;
 	mat4 normalMatrix;
 } push;
 //globalFrameData.projectionViewMatrix
-void main() 
+void main()
 {
   gl_Position = ubo1.projectionViewMatrix * push.transform * position;
   fragNormalWS = normalize(mat3(push.normalMatrix) * normal);

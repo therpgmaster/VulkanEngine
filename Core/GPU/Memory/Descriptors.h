@@ -5,9 +5,9 @@
 #include <glm/glm.hpp>
 
 // std
+#include <vector>
 #include <memory>
 #include <unordered_map>
-#include <vector>
 #include <iostream>// debug only
 
 namespace EngineCore
@@ -124,13 +124,33 @@ namespace EngineCore
 	class UBOCreateInfo
 	{
 	public:
-		enum class MemberType { none, scalar, vec2, vec3, vec4, mat4 };
 		UBOCreateInfo(EngineDevice& device) : device{ device } {};
-		void addMember(const MemberType& mt) { memberTypes.push_back(mt); }
 
+		enum class IntrMemberType { scalar, vec2, vec3, vec4, mat4 };
+		struct MemberTypeCreateInfo
+		{
+			// single or array of single type
+			MemberTypeCreateInfo(IntrMemberType t, uint32_t arrLen = 0)
+			{
+				types.push_back(t);
+				arrayLength = arrLen;
+			}
+			// struct or array of struct
+			MemberTypeCreateInfo(std::vector<IntrMemberType>& t, uint32_t arrLen = 0)
+			{
+				assert(!t.empty() && "tried to create ubo member type with no intrinsic types specified");
+				for (auto& x : t) { types.push_back(x); }
+				arrayLength = arrLen;
+			}
+			// single element if member is not a struct
+			std::vector<IntrMemberType> types;
+			// zero if member is not an array
+			uint32_t arrayLength = 0;
+		};
+		void addMember(const MemberTypeCreateInfo& mt) { members.push_back(mt); }
 	private:
 		friend class UBO;
-		std::vector<MemberType> memberTypes;
+		std::vector<MemberTypeCreateInfo> members;
 		EngineDevice& device;
 	};
 
@@ -138,28 +158,37 @@ namespace EngineCore
 	class UBO
 	{
 	public:
-		UBO(const UBOCreateInfo& createInfo, const uint32_t& numBuffers);
-
-		GBuffer* getBuffer(const uint32_t& index) { return buffers[index].get(); }
+		UBO(const UBOCreateInfo& createInfo, uint32_t numBuffers);
+		GBuffer* getBuffer(uint32_t index) { return buffers[index].get(); }
 
 	private:
 		friend class DescriptorSet;
-		using MT = UBOCreateInfo::MemberType;
-		struct MemberInfo
+		using IMT = UBOCreateInfo::IntrMemberType;
+		using MTCI = UBOCreateInfo::MemberTypeCreateInfo;
+		struct Member
 		{
-			MemberInfo(const size_t& a, const size_t& s) : alignment{ a }, size{ s }{};
-			size_t offset = 0; size_t size;  size_t alignment;
+			// first offset is relative to the buffer, subsequent ones are relative to the first
+			std::vector<size_t> offsets; 
+			std::vector<size_t> sizes; // without padding
+			uint32_t arrayLength = 0;
+			uint32_t arrayStride = 0;
 		};
-
-		std::vector<MemberInfo> members;
+		// index of: ubo member, instance (if array), struct field (if struct)
+		struct MemberAccessor 
+		{ 
+			uint32_t i, arr_i, field_i; 
+			MemberAccessor(uint32_t memberIndex, uint32_t arrayIndex = 0, uint32_t subMemberIndex = 0)
+				: i{ memberIndex }, arr_i{ arrayIndex }, field_i{ subMemberIndex }{};
+		};
+		std::vector<Member> members;
 		std::vector<std::unique_ptr<GBuffer>> buffers;
 		size_t size = 0; // size of one buffer, padding included
 
-		void addMembers(const std::vector<MT>& memberTypes);
-		MemberInfo getMemberTypeInfo(const MT& t);
+		void addMembers(const std::vector<MTCI>& memberCreateInfos);
+		void getIntrTypeAlignment(const IMT& t, uint32_t& sizeOut, uint32_t& alignmentOut) const;
 		void createBuffers(EngineDevice& device, const uint32_t& numBuffers);
-		void writeMember(const uint32_t& i, void* dataSize, const size_t& size,
-								const uint32_t& bufferIndex, const bool& flush);
+		void writeMember(const MemberAccessor& m, void* data, const size_t& dataSize,
+						uint32_t bufferIndex, bool flush);
 	};
 
 	/*	descriptor set abstraction, this enables descriptor sets to be managed as self-contained objects, 
@@ -182,13 +211,13 @@ namespace EngineCore
 		void finalize(); // allocates descriptors, builds the set layout and VkDescriptorSets  
 
 		template<typename T> // user-friendly uniform buffer data push function
-		void writeUBOMember(const uint32_t& uboIndex, T& data, const uint32_t& memberIndex,
-							const uint32_t& frameIndex, const bool& flush = true)
-		{ getUBO(uboIndex).writeMember(memberIndex, (void*)&data, sizeof(T), frameIndex, flush); }
+		void writeUBOMember(uint32_t uboIndex, T& data, const UBO::MemberAccessor& position,
+							uint32_t frameIndex, bool flush = true)
+		{ getUBO(uboIndex).writeMember(position, (void*)&data, sizeof(T), frameIndex, flush); }
 
-		UBO& getUBO(const uint32_t& uboIndex);
+		UBO& getUBO(uint32_t uboIndex);
 		VkDescriptorSetLayout getLayout();
-		VkDescriptorSet getDescriptorSet(const uint32_t& frameIndex) { return sets[frameIndex]; }
+		VkDescriptorSet getDescriptorSet(uint32_t frameIndex) { return sets[frameIndex]; }
 
 	private:
 		std::unique_ptr<DescriptorPool> pool{};
@@ -196,9 +225,9 @@ namespace EngineCore
 		std::vector<VkDescriptorSet> sets; // per frame (identical layout)
 		std::vector<std::unique_ptr<UBO>> ubos; // managed ubo (each has internal per-frame buffers)
 		// descriptor info containers necessary to preserve pointers for vulkan
-		std::vector<std::unique_ptr<VkDescriptorBufferInfo>> bufferInfos;
+		std::vector<VkDescriptorBufferInfo> bufferInfos;
 		std::vector<std::unique_ptr<VkDescriptorImageInfo>> samplerImageInfos;
-		std::vector<std::unique_ptr<VkDescriptorImageInfo>> imageArraysInfos; // must be contiguous
+		std::vector<std::vector<VkDescriptorImageInfo>> imageArraysInfos; // must be contiguous
 		std::vector<uint32_t> imageArraysSizes;
 		std::vector<std::unique_ptr<VkDescriptorImageInfo>> samplerInfos;
 		

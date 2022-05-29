@@ -9,11 +9,19 @@
 namespace EngineCore 
 {
 
-	Image::Image(EngineDevice& device, const std::string& path) : device{ device }
+	Image::Image(EngineDevice& device, const std::string& path) 
+		: device{ device }
 	{
 		loadFromDisk(path);
 		imageView = createImageView(device, image, VK_FORMAT_R8G8B8A8_SRGB);
 		createSampler(sampler, device, 1.f); // TODO: need to check if device supports the anisotropy level!
+	}
+
+	Image::Image(EngineDevice& device, VkImageCreateInfo info, 
+				VkMemoryPropertyFlags memProps = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+				: device{ device }
+	{
+		initImage(memProps, info);
 	}
 
 	Image::~Image() 
@@ -48,19 +56,20 @@ namespace EngineCore
 
 		/*	allocate and prep the image for write - device local memory is the fastest
 			but does not allow direct modification from the host */
-		initImage(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, width, height);
+		VkImageCreateInfo info = makeImageCreateInfo(width, height); // using defaults set in this function
+		initImage(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, info);
 
 		// transfer data from buffer to image
 		copyBufferToImage(stagingBuffer, static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1);
 	}
 
-	VkImageCreateInfo Image::makeImageCreateInfo(const uint32_t& width, const uint32_t& height)
+	VkImageCreateInfo Image::makeImageCreateInfo(uint32_t width, uint32_t height)
 	{
 		VkImageCreateInfo ci{};
 		ci.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		ci.imageType = VK_IMAGE_TYPE_2D; // regular flat image texture
-		ci.extent.width = static_cast<uint32_t>(width);
-		ci.extent.height = static_cast<uint32_t>(height);
+		ci.extent.width = width;
+		ci.extent.height = height;
 		ci.extent.depth = 1;
 		ci.mipLevels = 1;
 		ci.arrayLayers = 1;
@@ -74,13 +83,9 @@ namespace EngineCore
 	}
 
 	// performs the memory allocation for the underlying VkImage
-	void Image::initImage(VkMemoryPropertyFlags memProps,
-							uint32_t width, uint32_t height)
+	void Image::initImage(VkMemoryPropertyFlags memProps, VkImageCreateInfo info)
 	{
-		// uses defaults set by the function
-		VkImageCreateInfo imgInfo = makeImageCreateInfo(width, height);
-
-		if (vkCreateImage(device.device(), &imgInfo, nullptr, &image) != VK_SUCCESS)
+		if (vkCreateImage(device.device(), &info, nullptr, &image) != VK_SUCCESS)
 		{ throw std::runtime_error("failed to create image"); }
 
 		VkMemoryRequirements memRequirements;
@@ -170,14 +175,15 @@ namespace EngineCore
 		transitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	}
 
-	VkImageView Image::createImageView(EngineDevice& device, VkImage image, VkFormat format) 
+	VkImageView Image::createImageView(EngineDevice& device, VkImage image, VkFormat format, 
+										VkImageAspectFlags aspect, VkImageViewType viewType)
 	{
 		VkImageViewCreateInfo info{};
 		info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		info.image = image;
-		info.viewType = VK_IMAGE_VIEW_TYPE_2D;
 		info.format = format;
-		info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		info.viewType = viewType;
+		info.subresourceRange.aspectMask = aspect;
 		info.subresourceRange.baseMipLevel = 0;
 		info.subresourceRange.levelCount = 1;
 		info.subresourceRange.baseArrayLayer = 0;

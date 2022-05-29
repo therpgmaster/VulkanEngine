@@ -13,14 +13,12 @@ layout(std140, set = 0, binding = 0) uniform UBO1
 	mat4 projectionViewMatrix;
 } ubo1;
 
-layout(std140, set = 0, binding = 1) uniform UBO2 
-{
-	vec3 hue;
-} ubo2;
+//layout(set = 0, binding = 3) uniform sampler2D texSampler;
 
-layout(set = 0, binding = 3) uniform sampler2D texSampler;
+layout(set = 0, binding = 1) uniform texture2D textures[2];
+layout(set = 0, binding = 3) uniform sampler _sampler;
 
-layout(push_constant) uniform Push	
+layout(push_constant) uniform Push
 {
 	mat4 transform;
 	mat4 normalMatrix;
@@ -29,5 +27,6 @@ layout(push_constant) uniform Push
 void main() 
 {
 	gl_FragDepth = 0.9;
-	outColor = texture(texSampler, fragUV);
+	//outColor = texture(texSampler, fragUV);
+	outColor = texture(sampler2D(textures[1], _sampler), fragUV);
 }

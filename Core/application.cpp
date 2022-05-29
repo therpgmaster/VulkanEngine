@@ -32,24 +32,20 @@ namespace EngineCore
 	{
 		MeshRenderSystem meshRenderSys{ device, renderer.getSwapchainRenderPass() };
 
-		// global descriptor set layout
-		//std::vector<VkDescriptorSetLayout> setLayout =
-		//{ globalDSetMgr.layout.get()->getDescriptorSetLayout() };
-
-		// texture test (TODO: this is not an ideal way to store these objects)
+		// texture test TODO: this is not an ideal way to store these objects
 		Image& marsTexture = *new Image(device, makePath("Textures/mars6k_v2.jpg"));
 		Image& spaceTexture = *new Image(device, makePath("Textures/space.png"));
 
 		// runtime descriptors test
 		UBOCreateInfo ubo1{ device };
-		ubo1.addMember(UBOCreateInfo::MemberType::mat4);
-		UBOCreateInfo ubo2{ device };
-		ubo2.addMember(UBOCreateInfo::MemberType::vec3);
+		ubo1.addMember(UBOCreateInfo::IntrMemberType::mat4); // MVP matrix
+		ubo1.addMember(UBOCreateInfo::IntrMemberType::vec3); // camera position
 
 		dset.addUBO(ubo1);
-		dset.addUBO(ubo2);
-		dset.addCombinedImageSampler(marsTexture.imageView, marsTexture.sampler);
-		dset.addCombinedImageSampler(spaceTexture.imageView, spaceTexture.sampler);
+		dset.addImageArray(std::vector<VkImageView>{ marsTexture.imageView, spaceTexture.imageView });
+		dset.addSampler(marsTexture.sampler);
+		//dset.addCombinedImageSampler(marsTexture.imageView, marsTexture.sampler);
+		//dset.addCombinedImageSampler(spaceTexture.imageView, spaceTexture.sampler);
 		dset.finalize();
 		std::vector<VkDescriptorSetLayout> dsetLayout = { dset.getLayout() };
 		
@@ -64,11 +60,9 @@ namespace EngineCore
 		window.input.captureMouseCursor(true);
 		setupDefaultInputs();
 
-		// TODO: hardcoded paths - create test materials
+		// create test materials
 		ShaderFilePaths shader(makePath("Shaders/shader.vert.spv"),
 								makePath("Shaders/shader.frag.spv"));
-		//ShaderFilePaths shader2("G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shader.vert.spv",
-			//"G:/VulkanDev/VulkanEngine/Core/DevResources/Shaders/shaderDifferentColor.frag.spv");
 
 		auto mat1 = materialsMgr.createMaterial(MaterialCreateInfo(shader, dsetLayout));
 		//auto mat2 = materialsMgr.createMaterial(MaterialCreateInfo(shader2, setLayout));
@@ -96,23 +90,13 @@ namespace EngineCore
 				const uint32_t frameIndex = renderer.getFrameIndex(); // current framebuffer index
 				engineClock.measureFrameDelta(frameIndex);
 
-				// update scene global descriptors
-				/*SceneGlobalDataBuffer bufferData{};
-				bufferData.projectionViewMatrix = camera.getProjectionMatrix()
-					* Camera::getWorldBasisMatrix() * camera.getViewMatrix(true);
-				globalDSetMgr.writeToSceneGlobalBuffer(frameIndex, bufferData, true);*/
-
 				glm::mat4 pvm{ 1.f };
 				pvm = camera.getProjectionMatrix() * Camera::getWorldBasisMatrix() * camera.getViewMatrix(true);
 				dset.writeUBOMember(0, pvm, 0, frameIndex);
 
-				glm::vec3 rgb{ 0.1f, 0.08f, 0.7f };
-				dset.writeUBOMember(1, rgb, 0, frameIndex);
-				
-
 				//applyWorldOriginOffset(camera.transform); //(TODO: ) experimental
 
-				imguiObj.newFrame(); // imgui
+				//imguiObj.newFrame(); // imgui
 
 				renderer.beginSwapchainRenderPass(commandBuffer);
 
@@ -129,7 +113,7 @@ namespace EngineCore
 				meshRenderSys.renderMeshes(commandBuffer, loadedMeshes, engineClock.getDelta(), engineClock.getElapsed(),
 											dset.getDescriptorSet(frameIndex), simDistOffsets); //FakeScaleTest082
 				
-				imguiObj.render(commandBuffer); // imgui
+				//imguiObj.render(commandBuffer); // imgui
 
 				// camera movement
 				auto lookInput = window.input.getMouseDelta();
