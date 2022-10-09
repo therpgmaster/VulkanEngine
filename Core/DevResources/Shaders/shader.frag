@@ -1,4 +1,5 @@
 #version 450
+#extension GL_EXT_scalar_block_layout: require
 // inputs from vertex shader
 layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec3 fragPositionWS;
@@ -7,21 +8,21 @@ layout(location = 3) in vec2 fragUV;
 
 layout (location = 0) out vec4 outColor;
 
-layout(std140, set = 0, binding = 0) uniform UBO1 
+struct testStruct
+{
+	float s;
+	vec3 v;
+};
+
+layout(std430, set = 0, binding = 0) uniform UBO1 
 {
 	mat4 projectionViewMatrix;
+	testStruct[2] test;
 } ubo1;
 
-//layout(set = 0, binding = 2) uniform sampler2D texSampler;
-
 layout(set = 0, binding = 1) uniform texture2D textures[2];
-layout(set = 0, binding = 3) uniform sampler _sampler;
-
-layout(push_constant) uniform Push
-{
-	mat4 transform;
-	mat4 normalMatrix;
-} push;
+layout(set = 0, binding = 2) uniform sampler _sampler;
+//layout(set = 0, binding = 1) uniform sampler2D texSampler;
 
 void main()
 {
@@ -35,5 +36,7 @@ void main()
 	//outColor = vec4((lightDiffuse + lightAmbient) * fragColor, 1.0);
 	//outColor = vec4(fragUV.x * ubo2.hue.x, fragUV.y * ubo2.hue.y, 0.5 * ubo2.hue.z, 1.0); // test uv coords
 	//outColor = texture(texSampler, fragUV);
-	outColor = texture(sampler2D(textures[0], _sampler), fragUV);
+	vec4 c = texture(sampler2D(textures[0], _sampler), fragUV);
+	//outColor = vec4(t.x * ubo2.scalars[0], t.y * ubo2.scalars[1], t.z * ubo2.scalars[2], t.w);
+	outColor = vec4(c.x * ubo1.test[0].s, c.y, c.z, c.w);
 }

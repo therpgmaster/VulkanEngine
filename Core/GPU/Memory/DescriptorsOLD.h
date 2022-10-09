@@ -121,72 +121,62 @@ namespace EngineCore
 		void writeToSceneGlobalBuffer(const uint32_t& frameIndex, SceneGlobalDataBuffer& data, const bool& flush);
 	};*/
 
-
-	enum class uelem { scalar, vec2, vec3, vec4, mat4 };
-	/*	intermediate representation of a uniform buffer structure tree, 
-	*	used as a precursor to generate a UBO_Layout */
-	class UBO_Struct
+	class UBOCreateInfo
 	{
-		friend class UBO_Layout;
-		// innermost ("leaf") layer in the structure tree - a nested structure or single data element
-		struct UBO_StructLeaf
-		{
-			std::vector<uelem> elems{};
-			size_t arrlen;
-			// note that the array length is not the same as the number of elements
-			UBO_StructLeaf(const std::vector<uelem>& t, const size_t& arrl);
-		};
-
-		std::vector<UBO_StructLeaf> fields; // elements and nested structures added to this structure
-		
 	public:
-		// adds a single data type to this structure (or an array containing that type)
-		void add(uelem t, const size_t& arrayLength = 1);
-		// adds a nested structure to this structure (or an array containing that structure)
-		void add(const std::vector<uelem>& t, const size_t& arrayLength = 1);
-	};
+		UBOCreateInfo(EngineDevice& device) : device{ device } {};
 
-	// the actual memory layout information for a uniform buffer structure
-	class UBO_Layout
-	{
-		// memory offsets generated from a UBO_Struct::UBO_StructLeaf
-		struct Leaf
+		enum IntrMemberType { scalar, vec2, vec3, vec4, mat4 };
+		// single or array of single type
+		void addMember(IntrMemberType t, uint32_t arrLen = 0);
+		// struct or array of struct
+		void addMember(const std::vector<IntrMemberType>& t, uint32_t arrLen = 0);
+	private:
+		friend class UBO;
+		struct MemberTypeCreateInfo
 		{
-			std::vector<size_t> offsets{}; // element start offsets (all relative to buffer)
-			std::vector<size_t> sizes{};
-			size_t stride = 0; // instance size (includes inter-element alignment padding)
-			size_t arrlen = 0; // number of instances in the array (total size = stride * arrlen)
+			// single element if member is not a struct
+			std::vector<IntrMemberType> types;
+			// zero if member is not an array
+			uint32_t arrayLength = 0;
 		};
-
-		std::vector<Leaf> fields; // offset and size information for all elements in the uniform buffer
-		size_t bufferSize = 0; // required size for data + alignment padding
-
-		void align(UBO_Struct::UBO_StructLeaf f, const size_t& startOffset, 
-				std::vector<size_t>& offsetsOut, std::vector<size_t>& sizesOut, size_t& strideOut) const;
-		void getAlignmentForElementType(uelem e, size_t& sizeOut, size_t& alignmentOut) const;
-	public:
-		UBO_Layout(const UBO_Struct& typeLayout);
-		const size_t& getBufferSize() const { return bufferSize; }
-		// field index, array index, element index
-		struct ElementAccessor { size_t i, a, e; };
-		void accessElement(ElementAccessor loc, size_t& sizeOut, size_t& offsetOut);
+		std::vector<MemberTypeCreateInfo> members;
+		EngineDevice& device;
 	};
-
 
 	/* uniform buffer abstraction - this represents a specialized GPU buffer for in-shader (descriptor set) use */
 	class UBO
 	{
 	public:
-		UBO(const UBO_Layout& sLayout, uint32_t numBuffers, EngineDevice& device);
+		UBO(const UBOCreateInfo& createInfo, uint32_t numBuffers);
 		GBuffer* getBuffer(uint32_t index) { return buffers[index].get(); }
+		// index of: ubo member, instance (if array), struct field (if struct)
+		struct MemberAccessor
+		{
+			uint32_t i, arr_i, field_i;
+			MemberAccessor(uint32_t memberIndex, uint32_t arrayIndex = 0, uint32_t subMemberIndex = 0)
+				: i{ memberIndex }, arr_i{ arrayIndex }, field_i{ subMemberIndex }{};
+		};
 	private:
 		friend class DescriptorSet;
+		using IMT = UBOCreateInfo::IntrMemberType;
+		using MTCI = UBOCreateInfo::MemberTypeCreateInfo;
+		struct Member
+		{
+			std::vector<size_t> offsets;
+			std::vector<size_t> sizes; // without padding
+			uint32_t arrayStride = 0; // member instance size
+			uint32_t arrayLength = 0; // instances
+		};
 		
-		UBO_Layout structLayout;
+		std::vector<Member> members;
 		std::vector<std::unique_ptr<GBuffer>> buffers;
+		size_t size = 0; // size of one buffer, padding included
 
+		void addMembers(const std::vector<MTCI>& memberCreateInfos);
+		void getIntrTypeAlignment(const IMT& t, uint32_t& sizeOut, uint32_t& alignmentOut) const;
 		void createBuffers(EngineDevice& device, const uint32_t& numBuffers);
-		void writeMember(const UBO_Layout::ElementAccessor& loc, void* data, const size_t& dataSize,
+		void writeMember(const MemberAccessor& a, void* data, const size_t& dataSize,
 						uint32_t bufferIndex, bool flush);
 	};
 
@@ -202,7 +192,7 @@ namespace EngineCore
 		DescriptorSet& operator=(const DescriptorSet&) = delete;
 
 		// add a descriptor to the set, actual binding indices depend on the order in the finalize function
-		void addUBO(const UBO_Struct& structureLayout, EngineDevice& device);
+		void addUBO(const UBOCreateInfo& createInfo);
 		void addCombinedImageSampler(const VkImageView& view, const VkSampler& sampler);
 		void addImageArray(const std::vector<VkImageView>& views);
 		void addSampler(const VkSampler& sampler);
@@ -210,7 +200,7 @@ namespace EngineCore
 		void finalize(); // allocates descriptors, builds the set layout and VkDescriptorSets  
 
 		template<typename T> // user-friendly uniform buffer data push function
-		void writeUBOMember(uint32_t uboIndex, T& data, const UBO_Layout::ElementAccessor& position,
+		void writeUBOMember(uint32_t uboIndex, T& data, const UBO::MemberAccessor& position,
 							uint32_t frameIndex, bool flush = true)
 		{ getUBO(uboIndex).writeMember(position, (void*)&data, sizeof(T), frameIndex, flush); }
 

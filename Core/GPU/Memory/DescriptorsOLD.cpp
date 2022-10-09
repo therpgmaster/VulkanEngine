@@ -3,7 +3,6 @@
 #include "Core/GPU/Memory/Image.h"
 
 // std
-#include <algorithm>
 #include <cassert>
 #include <stdexcept>
 #include <iostream>
@@ -239,102 +238,116 @@ namespace EngineCore
 		if (flush) { buffers[frameIndex]->flush(); }
 	}*/
 
-	//		NEW DYNAMIC UBO IMPLEMENTATION (START)
-
-	void UBO_Struct::add(uelem t, const size_t& arrayLength) { add(std::vector<uelem>{t}, arrayLength); }
-
-	void UBO_Struct::add(const std::vector<uelem>& t, const size_t& arrayLength)
-	{ fields.push_back(UBO_StructLeaf(std::vector<uelem>{t}, arrayLength)); }
-	
-	UBO_Struct::UBO_StructLeaf::UBO_StructLeaf(const std::vector<uelem>& t, const size_t& arrl)
-											: elems{ t }, arrlen{ arrl } {};
-
-	// generates the correct memory offsets for the ubo data fields
-	UBO_Layout::UBO_Layout(const UBO_Struct& typeLayout) 
+	void UBOCreateInfo::addMember(IntrMemberType t, uint32_t arrLen)
 	{
-		// for each top level field in the ubo structure (Vulkan spec: "OpTypeStruct member")
-		for (auto& f : typeLayout.fields) 
-		{
-			Leaf field{};
-			field.arrlen = f.arrlen;
-
-			align(f, bufferSize, field.offsets, field.sizes, field.stride); // find alignments for field
-			fields.push_back(field);
-			bufferSize += field.stride * field.arrlen;
-		}
+		MemberTypeCreateInfo mtci;
+		mtci.types.push_back(t);
+		mtci.arrayLength = arrLen;
+		members.push_back(mtci);
 	}
-
-	void UBO_Layout::align(UBO_Struct::UBO_StructLeaf f, const size_t& startOffset, 
-						std::vector<size_t>& offsetsOut, std::vector<size_t>& sizesOut, size_t& strideOut) const
+	void UBOCreateInfo::addMember(const std::vector<IntrMemberType>& t, uint32_t arrLen)
 	{
-		sizesOut.clear();
-		std::vector<size_t> alignments{};
-
-		for (auto& e : f.elems)
-		{
-			size_t size, alignment;
-			getAlignmentForElementType(e, size, alignment);
-			sizesOut.push_back(size);
-			alignments.push_back(alignment);
-			// Vulkan spec: "a structure has a base alignment equal to the largest base alignment of any of its members"
-			alignments[0] = std::max(alignment, alignments[0]);
-		}
-
-		offsetsOut.clear();
-		strideOut = 0;
-		auto seek = startOffset;
-
-		for (size_t i = 0; i < alignments.size(); i++)
-		{ 
-			const size_t offset = Math::roundUpToClosestMultiple(seek, alignments[i]); // calculate offset
-			offsetsOut.push_back(offset);
-			seek += (offset - seek) + sizesOut[i];
-		}
-		strideOut = seek - startOffset;
+		assert(!t.empty() && "tried to create ubo member type with no intrinsic types specified");
+		MemberTypeCreateInfo mtci;
+		mtci.types = t;
+		mtci.arrayLength = arrLen;
+		members.push_back(mtci);
 	}
-
-	void UBO_Layout::getAlignmentForElementType(uelem e, size_t& sizeOut, size_t& alignmentOut) const
-	{
-		// vulkan imposes alignment requirements for data used in uniform buffer descriptors
-		size_t a = 0, s = 0;
-		if (e == uelem::scalar) { a = s = 4; } // 1 * scalar
-		else if (e == uelem::vec2) { a = s = 8; } // 2 * scalar
-		else if (e == uelem::vec3) { a = 16, s = 12; } // 4 * scalar
-		else if (e == uelem::vec4) { a = s = 16; } // 4 * scalar
-		else if (e == uelem::mat4) { a = 16, s = 64; } // 4 * scalar
-		assert(s > 0 && "failed to get alignment for uniform buffer member element, unknown type");
-		alignmentOut = a, sizeOut = s;
-	}
-
-	void UBO_Layout::accessElement(ElementAccessor loc, size_t& sizeOut, size_t& offsetOut)
-	{
-		if (loc.i >= fields.size()) { throw std::runtime_error("index exceeds uniform buffer fields"); }
-		auto& f = fields[loc.i];
-		if (loc.a >= f.arrlen) { throw std::runtime_error("array index exceeds uniform buffer field array length"); }
-		if (loc.e >= f.offsets.size()) { throw std::runtime_error("element index exceeds uniform buffer field elements"); }
-		auto elementBaseOffset = f.offsets[loc.e];
-		offsetOut = elementBaseOffset + f.stride * loc.a;
-		sizeOut = f.sizes[loc.e];
-	}
-
-	//		NEW DYNAMIC UBO IMPLEMENTATION (END)
 
 	// *************** Uniform Buffer wrapper *********************
 
-	UBO::UBO(const UBO_Layout& sLayout, uint32_t numBuffers, EngineDevice& device) : structLayout{ sLayout }
+	UBO::UBO(const UBOCreateInfo& createInfo, uint32_t numBuffers)
 	{
-		createBuffers(device, numBuffers);
+		addMembers(createInfo.members);
+		createBuffers(createInfo.device, numBuffers);
 	}
 
-	void UBO::writeMember(const UBO_Layout::ElementAccessor& loc, void* data, const size_t& dataSize,
+	void UBO::writeMember(const MemberAccessor& a, void* data, const size_t& dataSize,
 						uint32_t bufferIndex, bool flush)
 	{
-		size_t dstSize, dstOffset;
-		structLayout.accessElement(loc, dstSize, dstOffset);
+		assert(a.i < members.size() && "cannot write to uniform buffer, invalid member index");
+		const auto& m = members[a.i];
+		assert(a.arr_i < m.arrayLength || a.arr_i == 0 && "cannot write to uniform buffer, index exceeds array length");
 
+		const auto& dstSize = m.sizes[a.field_i];
+		const auto& dstOffset = m.offsets[a.field_i] + (m.arrayStride * a.arr_i);
 		if (dataSize != dstSize) { throw std::runtime_error("cannot write to uniform buffer, incompatible data size"); }
+
 		getBuffer(bufferIndex)->writeToBuffer(data, dataSize, dstOffset);
 		if (flush) { getBuffer(bufferIndex)->flush(); }
+	}
+
+	void UBO::addMembers(const std::vector<MTCI>& memberCreateInfos)
+	{
+		for (uint32_t m_i = 0; m_i < memberCreateInfos.size(); m_i++)
+		{
+			const auto& memberInfo = memberCreateInfos[m_i];
+			if (memberInfo.types.empty()) { throw std::runtime_error("cannot add member to uniform buffer, unspecified type info"); }
+			// calculate alignments
+			std::vector<uint32_t> alignments;
+			std::vector<uint32_t> sizes;
+			for (auto& t : memberInfo.types) 
+			{
+				uint32_t t_size, t_alignment;
+				// get alignment requirement for simple data type
+				getIntrTypeAlignment(t, t_size, t_alignment);
+				alignments.push_back(t_alignment);
+				sizes.push_back(t_size);
+			}
+			
+			// structs must be aligned to the largest alignment of their elements rounded up to 16
+			if (alignments.size() > 1) 
+			{ 
+				uint32_t maxAlignment = 0;
+				for (const auto& a : alignments) { if (a > maxAlignment) { maxAlignment = a; } }
+				alignments[0] = Math::roundUpToClosestMultiple(maxAlignment, (uint32_t)16);
+			}
+			// arrays must be aligned to the same alignment as the element type rounded up to 16
+			if (memberInfo.arrayLength > 1) 
+			{
+				alignments[0] = Math::roundUpToClosestMultiple(alignments[0], (uint32_t)16);
+			}
+
+			Member m;
+			size_t seekPos = size; // memory location relative to buffer start
+			// decide location for each individual data element
+			for (uint32_t i = 0; i < alignments.size(); i++)
+			{
+				// find suitable offset (location) for element, at its required alignment
+				size_t offset = Math::roundUpToClosestMultiple(seekPos, (size_t)alignments[i]);
+				/*	when using a separate buffer for each UBO (although that should be revised in the future)
+				start the very first data element at zero, without any specific alignment */
+				//if (i == 0 && m_i == 0) { offset = 0; }
+
+				m.offsets.push_back(offset);
+				m.sizes.push_back((size_t)sizes[i]);
+				const size_t elementSize = offset + sizes[i]; // size including padding
+				m.arrayStride += elementSize; // total size of member (per instance, if array)
+				seekPos += elementSize;
+			}
+
+			
+			uint32_t arrSizeMultiplier = 1;
+			if (memberInfo.arrayLength > 1) { arrSizeMultiplier = memberInfo.arrayLength; }
+			size += m.arrayStride * arrSizeMultiplier; // increase size of buffer
+			m.arrayLength = memberInfo.arrayLength;
+			members.push_back(m);
+		}
+	}
+
+	void UBO::getIntrTypeAlignment(const IMT& t, uint32_t& sizeOut, uint32_t& alignmentOut) const
+	{
+		// vulkan imposes alignment requirements for data used in uniform buffer descriptors
+		uint32_t a = 0;
+		uint32_t s = 0;
+		if (t == IMT::scalar)		{ a = 4; s = 4; } // 1 * scalar
+		else if (t == IMT::vec2)	{ a = 8; s = 8; } // 2 * scalar
+		else if (t == IMT::vec3)	{ a = 16; s = 12; } // 4 * scalar
+		else if (t == IMT::vec4)	{ a = 16; s = 16; } // 4 * scalar
+		else if (t == IMT::mat4)	{ a = 16; s = 64; } // 4 * scalar
+		assert(s > 0 && "failed to get alignment and size for uniform buffer member, unknown type");
+		alignmentOut = a;
+		sizeOut = s;
 	}
 
 	void UBO::createBuffers(EngineDevice& device, const uint32_t& numBuffers)
@@ -342,7 +355,7 @@ namespace EngineCore
 		auto minOffsetAlignment = device.properties.limits.minUniformBufferOffsetAlignment;
 		for (uint32_t i = 0; i < numBuffers; i++) 
 		{
-			buffers.push_back(std::make_unique<GBuffer>(device, structLayout.getBufferSize(), 1,
+			buffers.push_back(std::make_unique<GBuffer>(device, size, 1,
 						VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
 						minOffsetAlignment));
 			buffers.back()->map();
@@ -351,9 +364,9 @@ namespace EngineCore
 
 	// *************** Descriptor set wrapper *********************
 
-	void DescriptorSet::addUBO(const UBO_Struct& structureLayout, EngineDevice& device)
+	void DescriptorSet::addUBO(const UBOCreateInfo& createInfo)
 	{
-		ubos.push_back(std::make_unique<UBO>(UBO_Layout(structureLayout), framesInFlight, device));
+		ubos.push_back(std::make_unique<UBO>(createInfo, framesInFlight));
 	}
 
 	void DescriptorSet::addCombinedImageSampler(const VkImageView& view, const VkSampler& sampler)

@@ -37,11 +37,16 @@ namespace EngineCore
 		Image& spaceTexture = *new Image(device, makePath("Textures/space.png"));
 
 		// runtime descriptors test
-		UBOCreateInfo ubo1{ device };
-		ubo1.addMember(UBOCreateInfo::IntrMemberType::mat4); // MVP matrix
-		ubo1.addMember(UBOCreateInfo::IntrMemberType::vec3); // camera position
+		//UBOCreateInfo ubo1{ device };
+		//ubo1.addMember(UBOCreateInfo::mat4); // MVP matrix
+		//ubo1.addMember(UBOCreateInfo::vec3); // camera position
 
-		dset.addUBO(ubo1);
+		UBO_Struct ubo1{};
+		ubo1.add(uelem::mat4); // MVP matrix
+		ubo1.add(std::vector{uelem::scalar, uelem::vec3}, 2); // test
+		float testScalar = 0.f;
+		dset.addUBO(ubo1, device);
+
 		dset.addImageArray(std::vector<VkImageView>{ marsTexture.imageView, spaceTexture.imageView });
 		dset.addSampler(marsTexture.sampler);
 		//dset.addCombinedImageSampler(marsTexture.imageView, marsTexture.sampler);
@@ -92,7 +97,12 @@ namespace EngineCore
 
 				glm::mat4 pvm{ 1.f };
 				pvm = camera.getProjectionMatrix() * Camera::getWorldBasisMatrix() * camera.getViewMatrix(true);
-				dset.writeUBOMember(0, pvm, 0, frameIndex);
+				dset.writeUBOMember(0, pvm, UBO_Layout::ElementAccessor{ 0, 0, 0 }, frameIndex);
+
+				float testScalar1 = 1.f - std::sin(engineClock.getElapsed()* 10.f);
+				float testScalar2 = 1.f - std::sin(engineClock.getElapsed() * 50.f);
+				dset.writeUBOMember(0, testScalar1, UBO_Layout::ElementAccessor{ 1, 0, 0 }, frameIndex);
+				dset.writeUBOMember(0, testScalar2, UBO_Layout::ElementAccessor{ 1, 1, 0 }, frameIndex);
 
 				//applyWorldOriginOffset(camera.transform); //(TODO: ) experimental
 

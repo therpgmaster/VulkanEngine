@@ -80,7 +80,7 @@ namespace EngineCore
 		appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
 		appInfo.pEngineName = "RPG Engine";
 		appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-		appInfo.apiVersion = VK_API_VERSION_1_0;
+		appInfo.apiVersion = VK_API_VERSION_1_2; // target vulkan api v1.2
 
 		VkInstanceCreateInfo createInfo {};
 		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -160,11 +160,23 @@ namespace EngineCore
 			queueCreateInfos.push_back(queueCreateInfo);
 		}
 
-		VkPhysicalDeviceFeatures deviceFeatures = {};
-		deviceFeatures.samplerAnisotropy = VK_TRUE;
-		deviceFeatures.fillModeNonSolid = VK_TRUE;
-		deviceFeatures.wideLines = VK_TRUE;
-		deviceFeatures.largePoints = VK_TRUE;
+		// vulkan v1 features
+		VkPhysicalDeviceFeatures deviceFeatures1 = {};
+		deviceFeatures1.samplerAnisotropy = VK_TRUE;
+		deviceFeatures1.fillModeNonSolid = VK_TRUE;
+		deviceFeatures1.wideLines = VK_TRUE;
+		deviceFeatures1.largePoints = VK_TRUE;
+
+		VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
+		deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+		deviceFeatures2.features = deviceFeatures1;
+
+		// vulkan v1.2 features
+		VkPhysicalDeviceVulkan12Features deviceFeatures12 = {};
+		deviceFeatures12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+		deviceFeatures12.uniformBufferStandardLayout = VK_TRUE;
+
+		deviceFeatures2.pNext = &deviceFeatures12;
 
 		VkDeviceCreateInfo createInfo = {};
 		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -172,7 +184,8 @@ namespace EngineCore
 		createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
 		createInfo.pQueueCreateInfos = queueCreateInfos.data();
 
-		createInfo.pEnabledFeatures = &deviceFeatures;
+		createInfo.pEnabledFeatures = NULL;
+		createInfo.pNext = &deviceFeatures2; // features
 		createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
 		createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
@@ -444,7 +457,7 @@ namespace EngineCore
 
 		if (vkCreateBuffer(device_, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) 
 		{
-			throw std::runtime_error("failed to create vertex buffer!");
+			throw std::runtime_error("failed to create VkBuffer");
 		}
 
 		VkMemoryRequirements memRequirements;
@@ -456,7 +469,7 @@ namespace EngineCore
 		allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
 
 		if (vkAllocateMemory(device_, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) 
-		{ throw std::runtime_error("failed to allocate vertex buffer memory!"); }
+		{ throw std::runtime_error("failed to allocate VkBuffer memory"); }
 
 		vkBindBufferMemory(device_, buffer, bufferMemory, 0);
 	}
